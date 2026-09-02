@@ -75,7 +75,7 @@
       `find /home /tmp` — всегда скачивать закреплённую версию в `/tmp`.
 - [x] **T3.4 (S)** `make-boot-usb.ps1:111` — строку TLS 1.3 обернуть в try/catch
       (enum нет на .NET < 4.8).
-- [ ] **T3.5 (S)** `make-boot-usb.sh:227` — `chown` fallback вместо `asv-spb`
+- [x] **T3.5 (S)** `make-boot-usb.sh:227` — `chown` fallback вместо `asv-spb`
       использовать `${SUDO_USER:-$(logname 2>/dev/null || echo root)}`.
 - [ ] **T3.6 (M)** `shellcheck -S warning` чисто по всем `.sh`
       (осознанные отключки — с комментарием `# shellcheck disable=...`).

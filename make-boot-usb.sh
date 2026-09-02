@@ -283,7 +283,7 @@ restore_files() {
             rm -rf "$mnt_p1"
             die "Сбой копирования ISO-образов на раздел $P1. Бэкап сохранен: $BACKUP_DIR"
         fi
-        chown -R "${SUDO_USER:-asv-spb}:${SUDO_USER:-asv-spb}" "$mnt_p1/" 2>/dev/null || true
+        chown -R "${SUDO_USER:-$(logname 2>/dev/null || echo root)}:${SUDO_USER:-$(logname 2>/dev/null || echo root)}" "$mnt_p1/" 2>/dev/null || true
         local iso_ok=1
         verify_restored_tree "$BACKUP_DIR/iso" "$mnt_p1" || iso_ok=0
         umount "$mnt_p1" 2>/dev/null || true
@@ -307,7 +307,7 @@ restore_files() {
             rm -rf "$mnt_pd"
             die "Сбой копирования данных на раздел $dest_part. Бэкап сохранен: $BACKUP_DIR"
         fi
-        chown -R "${SUDO_USER:-asv-spb}:${SUDO_USER:-asv-spb}" "$mnt_pd/" 2>/dev/null || true
+        chown -R "${SUDO_USER:-$(logname 2>/dev/null || echo root)}:${SUDO_USER:-$(logname 2>/dev/null || echo root)}" "$mnt_pd/" 2>/dev/null || true
         local data_ok=1
         verify_restored_tree "$BACKUP_DIR/data" "$mnt_pd" || data_ok=0
         umount "$mnt_pd" 2>/dev/null || true
