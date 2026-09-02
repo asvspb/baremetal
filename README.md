@@ -60,7 +60,7 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 ---
 
-## 🧪 Тестирование (TEST-SPEC.md)
+## 🧪 Тестирование (docs/TEST-SPEC.md)
 
 ```bash
 bash tests/setup.sh     # один раз: bats-core, pwsh, xmllint (idempotent)
@@ -69,7 +69,7 @@ sudo -n make test       # = test-fast + L1 (парсинг ps1 через pwsh) 
 sudo -n make test-loop  # L4: реальные parted/mkfs на loop-устройствах (только /dev/loop*)
 ```
 
-* Уровни: L0 статика → L1 парсинг ps1 → L2 юниты → L3 интеграция на стабах → L4 loop → L5 dry-run E2E (см. `TEST-SPEC.md`).
+* Уровни: L0 статика → L1 парсинг ps1 → L2 юниты → L3 интеграция на стабах → L4 loop → L5 dry-run E2E (см. `docs/TEST-SPEC.md`).
 * **Безопасность:** тесты никогда не пишут на реальные диски; L3 крутится вокруг несуществующих `/dev/fakedisk*`, L4 — только `/dev/loop*` с проверкой имени устройства; заглушка `dd` всегда возвращает ошибку.
 * `make test-fast` подключен к pre-commit hook (при отсутствии deps — предупреждение, коммит не блокируется).
 * pwsh недоступен → уровень L1 выдаёт SKIP (штатная деградация), статический контроль остаётся в `check-files.sh`.
@@ -89,6 +89,10 @@ sudo -n make test-loop  # L4: реальные parted/mkfs на loop-устро�
 2. 🔌 [**`make-boot-usb.ps1`**](file:///home/asv-spb/Dev/deploy-baremetal/make-boot-usb.ps1) — создание загрузочных флешек под Windows.
 3. ⚡ [**`split-home.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/split-home.sh) — безрисковое разделение текущей Ubuntu на корень (200 ГБ) и `/home` (~427 ГБ).
 4. 💻 [**`deploy.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/deploy.sh) — модульный установщик чистых ОС с нуля (Ubuntu + Windows Dual-Boot).
+
+## 📚 Документация
+
+Спецификации, роадмапы и промпты для исполнителей — в папке [`docs/`](file:///home/asv-spb/Dev/deploy-baremetal/docs/README.md): ROADMAP (итоги ревью), TEST-SPEC (система тестов), FIX-SPEC и SPLIT-SPEC (циклы доработок), индекс — в `docs/README.md`.
 
 ---
 
