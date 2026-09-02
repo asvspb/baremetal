@@ -71,7 +71,7 @@
       (сейчас `dur_w_ms` — копипаста).
 - [x] **T3.2 (S)** `split-home.sh:247` — `rm -rf dir/.*` заменить на
       `find "$MNT_ROOT/home" -mindepth 1 -delete` (SC2115).
-- [ ] **T3.3 (S)** `make-boot-usb.sh` `ensure_ventoy_tool`: убрать блуждание
+- [x] **T3.3 (S)** `make-boot-usb.sh` `ensure_ventoy_tool`: убрать блуждание
       `find /home /tmp` — всегда скачивать закреплённую версию в `/tmp`.
 - [ ] **T3.4 (S)** `make-boot-usb.ps1:111` — строку TLS 1.3 обернуть в try/catch
       (enum нет на .NET < 4.8).

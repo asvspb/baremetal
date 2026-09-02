@@ -42,18 +42,15 @@ ensure_ventoy_tool() {
     if [[ -x "${VENTOY_DIR}/Ventoy2Disk.sh" ]]; then
         return 0
     fi
-    local local_v2d
-    local_v2d=$(find /home /tmp -name "Ventoy2Disk.sh" 2>/dev/null | head -n 1 || true)
-    if [[ -n "$local_v2d" && -x "$local_v2d" ]]; then
-        VENTOY_DIR="$(dirname "$local_v2d")"
-        return 0
-    fi
 
+    # Всегда скачиваем закреплённую версию в /tmp (без поиска по /home и /tmp,
+    # чтобы случайно не подхватить чужую/битую копию Ventoy2Disk.sh)
     info "Скачивание Ventoy v${VENTOY_VERSION}..."
     mkdir -p "$VENTOY_DIR"
     wget -qO- "https://github.com/ventoy/Ventoy/releases/download/v${VENTOY_VERSION}/ventoy-${VENTOY_VERSION}-linux.tar.gz" | \
         tar -xz -C "/tmp"
     VENTOY_DIR="/tmp/ventoy-${VENTOY_VERSION}"
+    [[ -x "${VENTOY_DIR}/Ventoy2Disk.sh" ]] || die "Не удалось загрузить Ventoy v${VENTOY_VERSION} в ${VENTOY_DIR}"
 }
 
 # ------------------------------------------------------------------------------
