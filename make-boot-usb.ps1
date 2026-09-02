@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.2"
+$ScriptVersion = "2026-09-02.3"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -1054,12 +1054,14 @@ try {
             Write-Log "Предупреждение при Set-Partition NoDefaultDriveLetter: $_" "WARN"
         }
 
-        # 4. Установка атрибутов GPT (ESP + NoDriveLetter + PlatformRequired)
+        # 4. Установка GPT-типа ESP. ВАЖНО: параметра -Attributes в Storage-модуле
+        # PS 5.1 нет — привязка параметров падает и -GptType не применяется;
+        # атрибуты 0xC000000000000001 ставит Diskpart-фолбэк ниже (шаг 5).
         try {
-            Set-Partition -DiskNumber $targetDisk.Number -PartitionNumber 2 -GptType '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}' -Attributes 0xC000000000000001 -ErrorAction SilentlyContinue
-            Write-Log "Установлены GPT ESP атрибуты 0xC000000000000001 на Раздел 2." "DEBUG"
+            Set-Partition -DiskNumber $targetDisk.Number -PartitionNumber 2 -GptType '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}' -ErrorAction SilentlyContinue
+            Write-Log "Установлен GPT-тип ESP (c12a7328) на Раздел 2; атрибуты ставит Diskpart (шаг 5)." "DEBUG"
         } catch {
-            Write-Log "Предупреждение при Set-Partition GptType/Attributes: $_" "WARN"
+            Write-Log "Предупреждение при Set-Partition GptType: $_" "WARN"
         }
 
         # 5. Гарантированное удаление буквы и защита через Diskpart
