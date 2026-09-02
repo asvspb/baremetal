@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.4"
+$ScriptVersion = "2026-09-02.5"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -84,6 +84,27 @@ function Write-LogBlock {
                 Add-Content -Path $tempLogPath -Value $block -Encoding UTF8 -ErrorAction SilentlyContinue
             } catch {}
         }
+    }
+}
+
+# ------------------------------------------------------------------------------
+# Измерение длительности этапов: пауза ОС (сон) внутри этапа видна в логе
+# как аномальная длительность ("Этап '...' завершен за N сек").
+# Хелперы не создают областей видимости — код этапов остаётся без изменений.
+# ------------------------------------------------------------------------------
+$script:PhaseStopwatch = $null
+$script:PhaseName = ""
+function Measure-PhaseStart {
+    param([Parameter(Mandatory=$true)][string]$Name)
+    $script:PhaseStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $script:PhaseName = $Name
+}
+function Measure-PhaseEnd {
+    if ($script:PhaseStopwatch) {
+        $script:PhaseStopwatch.Stop()
+        Write-Log ("Этап '{0}' завершен за {1} сек" -f $script:PhaseName, [int]$script:PhaseStopwatch.Elapsed.TotalSeconds) "INFO"
+        $script:PhaseStopwatch = $null
+        $script:PhaseName = ""
     }
 }
 
@@ -618,7 +639,9 @@ try {
     # --------------------------------------------------------------------------
     # 2. Автоматическая проверка целостности накопителя
     # --------------------------------------------------------------------------
+    Measure-PhaseStart 'Проверка целостности'
     Test-DriveIntegrity -diskNumber $targetDisk.Number
+    Measure-PhaseEnd
 
     # --------------------------------------------------------------------------
     # 3. Идентификация и бэкап данных на носителе перед разметкой
@@ -705,6 +728,7 @@ try {
             }
             Write-Log "Свободного места для бэкапа достаточно: нужно ~$([math]::Round($needBytes / 1MB, 2)) МБ, свободно $([math]::Round($backupDrive.Free / 1MB, 2)) МБ." "DEBUG"
 
+            Measure-PhaseStart 'Бэкап данных'
             New-Item -Path "$backupDir\iso" -ItemType Directory -Force | Out-Null
             New-Item -Path "$backupDir\data" -ItemType Directory -Force | Out-Null
             Write-Host "Копирование файлов во временное хранилище на ПК..." -ForegroundColor Cyan
@@ -737,6 +761,7 @@ try {
             }
             Write-Host "✅ Резервная копия успешно создана на ПК ($totalMB МБ)." -ForegroundColor Green
             Write-Log "Резервная копия успешно создана в каталоге: $backupDir" "SUCCESS"
+            Measure-PhaseEnd
         } else {
             Write-Log "Пользователь отказался от резервного копирования данных." "WARN"
         }
@@ -879,6 +904,7 @@ try {
     # ------------------------------------------------------------------------------
     # 7. Установка Ventoy на целевой USB диск
     # ------------------------------------------------------------------------------
+    Measure-PhaseStart 'Установка Ventoy'
     $reserveMB = 0
     if ($createDataPart) {
         $reserveMB = [math]::Max(0, [int]($totalSizeMB - ($ventoySizeGB * 1024) - 64))
@@ -1017,10 +1043,14 @@ try {
             }
         }
 
+        Measure-PhaseEnd
+
         # Установка официальной темы GRUB Xenlism под текущую версию Windows
+        Measure-PhaseStart 'Установка темы'
         if ($vPart.DriveLetter) {
             Install-XenlismTheme -ventoyDriveLetter $vPart.DriveLetter
         }
+        Measure-PhaseEnd
     }
 
     # Скрытие служебного EFI раздела (VTOYEFI, Раздел 2) в Проводнике Windows
@@ -1143,6 +1173,7 @@ try {
 
         $restoreFailed = $false
 
+        Measure-PhaseStart 'Восстановление ISO'
         # 1. ISO в раздел 1
         if ($p1 -and $p1.DriveLetter -and (Test-Path "$backupDir\iso")) {
             $isoFiles = Get-ChildItem -Path "$backupDir\iso" -Force -ErrorAction SilentlyContinue
@@ -1165,7 +1196,10 @@ try {
             }
         }
 
+        Measure-PhaseEnd
+
         # 2. Данные в раздел 3 (или в раздел 1, если раздел 3 не создавался)
+        Measure-PhaseStart 'Восстановление данных'
         $destPart = $p3
         $destLabel = $labelP3
         if (-not $destPart -or -not $destPart.DriveLetter -or [int][char]$destPart.DriveLetter -eq 0) {
@@ -1193,6 +1227,8 @@ try {
                 }
             }
         }
+
+        Measure-PhaseEnd
 
         # Временную копию удаляем только после успешной сверки восстановления
         if ($restoreFailed) {
@@ -1246,10 +1282,14 @@ try {
         $p3 = $finalParts | Where-Object { $_.PartitionNumber -eq 3 }
         
         if ($p1 -and $p1.DriveLetter) {
+            Measure-PhaseStart 'Замер скорости: Раздел 1'
             Run-SpeedTest -driveLetter ($p1.DriveLetter) -title "Раздел 1: Ventoy / ISO ($labelP1)"
+            Measure-PhaseEnd
         }
         if ($p3 -and $p3.DriveLetter) {
+            Measure-PhaseStart 'Замер скорости: Раздел 3'
             Run-SpeedTest -driveLetter ($p3.DriveLetter) -title "Раздел 3: Данные ($labelP3, $dataFS)"
+            Measure-PhaseEnd
         }
         Write-Host "`nВсе замеры скорости успешно завершены!" -ForegroundColor Green
     }
