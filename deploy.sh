@@ -21,6 +21,16 @@ warn()    { echo -e "${C_YELLOW}[ВНИМАНИЕ]${C_RESET} $*" >&2; }
 die()     { echo -e "${C_RED}[ОШИБКА]${C_RESET} $*" >&2; exit 1; }
 run()     { if (( DRY )); then echo -e "  ${C_CYAN}[dry-run]${C_RESET} $*"; else "$@"; fi; }
 
+# GRUB >= 2.06 не запускает os-prober, пока GRUB_DISABLE_OS_PROBER не
+# установлен явно в false — без этого Windows не появится в меню Dual-Boot.
+enable_os_prober() {
+    local grub_cfg="${1}/etc/default/grub"
+    if [[ -f "$grub_cfg" ]]; then
+        sed -i '/^[[:space:]]*GRUB_DISABLE_OS_PROBER=/d' "$grub_cfg"
+        echo "GRUB_DISABLE_OS_PROBER=false" >> "$grub_cfg"
+    fi
+}
+
 REAL_SOURCE="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
 # Каталог, из которого скрипт реально запущен (флешка). После переноса в RAM
@@ -482,7 +492,8 @@ EOF
         if [[ $PROTECT_GRUB_REMOVABLE -eq 1 ]]; then
             chroot "$root_mnt" grub-install --target=x86_64-efi --efi-directory=/boot/efi --removable
         fi
-        
+
+        enable_os_prober "$root_mnt"
         chroot "$root_mnt" update-grub
 
         for dev in /run /sys /proc /dev/pts /dev; do
@@ -534,6 +545,7 @@ main() {
             if ! (( DRY )); then
                 for dev in /dev /dev/pts /proc /sys /run; do mount --bind "$dev" "${root_mnt}${dev}"; done
                 chroot "$root_mnt" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --removable
+                enable_os_prober "$root_mnt"
                 chroot "$root_mnt" update-grub
                 for dev in /run /sys /proc /dev/pts /dev; do umount "${root_mnt}${dev}" 2>/dev/null || true; done
                 umount "$root_mnt/boot/efi" "$root_mnt"
