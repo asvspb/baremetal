@@ -179,6 +179,9 @@ check_home_usage() {
 # Основной поток (только при прямом запуске; source в тестах — только определения)
 main() {
     parse_args "$@"
+    trap cleanup_split EXIT
+    trap 'cleanup_split; exit 130' INT
+    trap 'cleanup_split; exit 143' TERM
     check_environment
     check_home_usage
 
@@ -264,6 +267,21 @@ success "Раздел p8 успешно создан и отформатиров
 # ------------------------------------------------------------------------------
 # 7. Миграция данных /home на новый раздел p8
 # ------------------------------------------------------------------------------
+
+# Cleanup-ловушка (по образцу cleanup_mounts в deploy.sh): прерывание посреди
+# миграции не оставляет смонтированных p7/p8. Читает глобальные MNT_*,
+# значения проверяются на пустоту.
+cleanup_split() {
+    local mp
+    for mp in "${MNT_HOME:-}" "${MNT_ROOT:-}"; do
+        [[ -n "$mp" ]] || continue
+        if grep -qE "^[^ ]+ $mp " /proc/mounts 2>/dev/null; then
+            umount "$mp" 2>/dev/null || true
+        fi
+    done
+    return 0
+}
+
 do_migrate_home() {
 MNT_ROOT="/tmp/split_root_mnt"
 MNT_HOME="/tmp/split_home_mnt"
@@ -272,17 +290,18 @@ info "Монтирование разделов для переноса файл
 run mkdir -p "$MNT_ROOT" "$MNT_HOME"
 run mount "$P7" "$MNT_ROOT"
 run mount "$P8" "$MNT_HOME"
+run fstrim -v "$MNT_HOME" 2>/dev/null || true
 
 if ! (( DRY )); then
     info "Копирование всех личных данных из /home на раздел p8 (rsync -aHAX)..."
-    rsync -aHAX --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
+    rsync -aHAXS --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
     success "Данные успешно скопированы на раздел p8!"
 
     # Сверка копии ДО уничтожения оригинала: второй проход rsync в dry-режиме
     # с itemize. Пустой вывод = деревья идентичны (контент, права, xattr, ACL,
     # hardlinks). Непустой = die: старый /home НЕ тронут, fstab НЕ изменён.
     info "Сверка копии с оригиналом (rsync -n --itemize)..."
-    verify_out="$(rsync -aHAXSn --itemize --out-format='%i %n' \
+    verify_out="$(rsync -aHAXSnS --itemize --out-format='%i %n' \
         "$MNT_ROOT/home/" "$MNT_HOME/" 2>&1 || true)"
     if [[ -n "$verify_out" ]]; then
         die "Сверка /home после копирования не сошлась (первые расхождения):
