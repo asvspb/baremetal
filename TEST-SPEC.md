@@ -207,7 +207,7 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 
 | Этап | Содержание | Оценка |
 |---|---|---|
-| T0 | Рефакторинг guard + golden-файл dry-run | M |
+| T0 | ✅ Рефакторинг guard + golden-файл dry-run | M |
 | T1 | setup.sh + каркас bats + L0/L1 в раннере | S |
 | T2 | Юниты U-* (deploy, usb-sh) | M |
 | T3 | Стабы + интеграционные I-M1..I-M8, I-D*, U-D6 | M |

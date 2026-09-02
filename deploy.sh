@@ -52,6 +52,14 @@ iana_to_windows_tz() {
     esac
 }
 
+# Путь к разделу N диска: для дисков с цифрой на конце (nvme0n1) добавляется "p"
+part_dev() {
+    local disk="$1" n="$2"
+    local sep=""
+    [[ "$disk" =~ [0-9]$ ]] && sep="p"
+    echo "${disk}${sep}${n}"
+}
+
 REAL_SOURCE="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
 # Каталог, из которого скрипт реально запущен (флешка). После переноса в RAM
@@ -98,28 +106,14 @@ cleanup_mounts() {
 trap cleanup_mounts EXIT
 
 # ==============================================================================
-# 🛡️ ЗАЩИТА ОТ БЛОКИРОВКИ LIVE-USB:
-# Автоматический перенос скрипта в оперативную память (RAM /tmp).
-# Если Live-образ заблокировал раздел флешки (loop/casper/ro), скрипт
-# мгновенно копирует себя в RAM и работает полностью изолированно.
+# Загрузка конфигурации (deploy.conf или значения по умолчанию)
 # ==============================================================================
-RAM_TARGET="/tmp/deploy-baremetal"
-if [[ "$SCRIPT_DIR" != "$RAM_TARGET" && -d /tmp ]]; then
-    mkdir -p "$RAM_TARGET"
-    cp -r "$SCRIPT_DIR"/* "$RAM_TARGET/" 2>/dev/null || true
-    chmod +x "$RAM_TARGET/deploy.sh" 2>/dev/null || true
-    if [[ -f "$RAM_TARGET/deploy.sh" ]]; then
-        exec bash "$RAM_TARGET/deploy.sh" "$@"
-    fi
-fi
-
-CONF_FILE="${SCRIPT_DIR}/deploy.conf"
-
-# Загрузка конфигурации
-if [[ -f "$CONF_FILE" ]]; then
-    # shellcheck disable=SC1090
-    source "$CONF_FILE"
-else
+load_config() {
+    local conf_file="${SCRIPT_DIR}/deploy.conf"
+    if [[ -f "$conf_file" ]]; then
+        # shellcheck disable=SC1090
+        source "$conf_file"
+    else
     TARGET_DISK="AUTO"
     EFI_SIZE_MB=500
     MSR_SIZE_MB=16
@@ -146,8 +140,10 @@ else
     INSTALL_RESTRICTED_DRIVERS=1
     PROTECT_GRUB_REMOVABLE=1
     ENABLE_SHARED_AUTOMOUNT=1
-fi
+    fi
+}
 
+# Значения по умолчанию режима (могут быть переопределены разбором аргументов)
 DRY=0
 YES=0
 MODE=""
@@ -184,24 +180,40 @@ EOF
 }
 
 # Разбор аргументов командной строки
-while (( $# )); do
-    case "$1" in
-        --prep-disk)           MODE="PREP_DISK" ;;
-        --full|-f)             MODE="PREP_DISK" ;;
-        --reinstall-ubuntu)    MODE="REINSTALL_UBUNTU" ;;
-        --reinstall-windows)   die "Режим --reinstall-windows удалён: Windows ставится загрузкой ISO с Ventoy (autounattend.xml), затем --reinstall-ubuntu (см. --help)." ;;
-        --repair-boot)         MODE="REPAIR_BOOT" ;;
-        --dry-run)             DRY=1 ;;
-        --yes|-y)              YES=1 ;;
-        --disk)                TARGET_DISK="${2:?Укажите диск после --disk}"; shift ;;
-        -h|--help)             usage ;;
-        *) die "Неизвестный параметр: $1 (используйте --help)" ;;
-    esac
-    shift
-done
+parse_args() {
+    while (( $# )); do
+        case "$1" in
+            --prep-disk)           MODE="PREP_DISK" ;;
+            --full|-f)             MODE="PREP_DISK" ;;
+            --reinstall-ubuntu)    MODE="REINSTALL_UBUNTU" ;;
+            --reinstall-windows)   die "Режим --reinstall-windows удалён: Windows ставится загрузкой ISO с Ventoy (autounattend.xml), затем --reinstall-ubuntu (см. --help)." ;;
+            --repair-boot)         MODE="REPAIR_BOOT" ;;
+            --dry-run)             DRY=1 ;;
+            --yes|-y)              YES=1 ;;
+            --disk)                TARGET_DISK="${2:?Укажите диск после --disk}"; shift ;;
+            -h|--help)             usage ;;
+            *) die "Неизвестный параметр: $1 (используйте --help)" ;;
+        esac
+        shift
+    done
+}
 
-# Проверка прав суперпользователя
-[[ $EUID -eq 0 ]] || die "Скрипт должен запускаться с правами root: sudo bash $0"
+# ==============================================================================
+# 🛡️ ЗАЩИТА ОТ БЛОКИРОВКИ LIVE-USB:
+# Автоматический перенос скрипта в оперативную память (RAM /tmp).
+# Если Live-образ заблокировал раздел флешки (loop/casper/ro), скрипт
+# мгновенно копирует себя в RAM и работает полностью изолированно.
+# ==============================================================================
+copy_to_ram_and_exec() {
+    local ram_target="/tmp/deploy-baremetal"
+    [[ "$SCRIPT_DIR" == "$ram_target" || ! -d /tmp ]] && return 0
+    mkdir -p "$ram_target"
+    cp -r "${SCRIPT_DIR}"/* "$ram_target/" 2>/dev/null || true
+    chmod +x "$ram_target/deploy.sh" 2>/dev/null || true
+    if [[ -f "$ram_target/deploy.sh" ]]; then
+        exec bash "$ram_target/deploy.sh" "$@"
+    fi
+}
 
 # Определение целевого диска
 detect_disk() {
@@ -339,15 +351,13 @@ do_partition_disk() {
 # 2. Форматирование разделов
 do_format_partitions() {
     info "Форматирование разделов..."
-    local sep=""
-    [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
-
-    local p_efi="${TARGET_DISK}${sep}1"
-    local p_win="${TARGET_DISK}${sep}3"
-    local p_rec="${TARGET_DISK}${sep}4"
-    local p_shared="${TARGET_DISK}${sep}5"
-    local p_root="${TARGET_DISK}${sep}6"
-    local p_home="${TARGET_DISK}${sep}7"
+    local p_efi p_win p_rec p_shared p_root p_home
+    p_efi="$(part_dev "$TARGET_DISK" 1)"
+    p_win="$(part_dev "$TARGET_DISK" 3)"
+    p_rec="$(part_dev "$TARGET_DISK" 4)"
+    p_shared="$(part_dev "$TARGET_DISK" 5)"
+    p_root="$(part_dev "$TARGET_DISK" 6)"
+    p_home="$(part_dev "$TARGET_DISK" 7)"
 
     run mkfs.fat -F32 -n "EFI" "$p_efi"
     run mkfs.ntfs -f -L "Windows" "$p_win"
@@ -440,12 +450,11 @@ do_prep_disk() {
 # 4. Развертывание Ubuntu и настройка /swapfile + 7 правил
 do_deploy_ubuntu() {
     info "Развертывание Ubuntu..."
-    local sep=""
-    [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
-    local p_efi="${TARGET_DISK}${sep}1"
-    local p_shared="${TARGET_DISK}${sep}5"
-    local p_root="${TARGET_DISK}${sep}6"
-    local p_home="${TARGET_DISK}${sep}7"
+    local p_efi p_shared p_root p_home
+    p_efi="$(part_dev "$TARGET_DISK" 1)"
+    p_shared="$(part_dev "$TARGET_DISK" 5)"
+    p_root="$(part_dev "$TARGET_DISK" 6)"
+    p_home="$(part_dev "$TARGET_DISK" 7)"
 
     local root_mnt="/tmp/ubuntu_root_mnt"
     run mkdir -p "$root_mnt"
@@ -579,7 +588,15 @@ EOF
 }
 
 # Запуск
+# Основной поток (только при запуске как скрипта, не при source)
 main() {
+    copy_to_ram_and_exec "$@"
+    load_config
+    parse_args "$@"
+
+    # Проверка прав суперпользователя
+    [[ $EUID -eq 0 ]] || die "Скрипт должен запускаться с правами root: sudo bash $0"
+
     [[ -z "$MODE" ]] && show_menu
     detect_disk
     find_isos
@@ -600,19 +617,15 @@ main() {
             ;;
         REINSTALL_UBUNTU)
             info "Точечная переустановка Ubuntu (корень /)..."
-            local sep=""
-            [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
-            run mkfs.ext4 -F -L "UbuntuRoot" "${TARGET_DISK}${sep}6"
+            run mkfs.ext4 -F -L "UbuntuRoot" "$(part_dev "$TARGET_DISK" 6)"
             do_deploy_ubuntu
             ;;
         REPAIR_BOOT)
             info "Восстановление загрузчика GRUB..."
-            local sep=""
-            [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
             local root_mnt="/tmp/boot_repair_root"
             run mkdir -p "$root_mnt"
-            run mount "${TARGET_DISK}${sep}6" "$root_mnt"
-            run mount "${TARGET_DISK}${sep}1" "$root_mnt/boot/efi"
+            run mount "$(part_dev "$TARGET_DISK" 6)" "$root_mnt"
+            run mount "$(part_dev "$TARGET_DISK" 1)" "$root_mnt/boot/efi"
             if ! (( DRY )); then
                 for dev in /dev /dev/pts /proc /sys /run; do mount --bind "$dev" "${root_mnt}${dev}"; done
                 chroot "$root_mnt" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --removable
@@ -634,4 +647,7 @@ main() {
     echo -e "Компьютер готов к работе. Извлеките Live-флешку и перезагрузитесь."
 }
 
-main
+# Guard: исполняем main только при прямом запуске (source в тестах — только определения)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

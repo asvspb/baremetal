@@ -1,0 +1,50 @@
+[1;34m[ИНФО][0m Запуск режима: PREP_DISK на диске /dev/nvme0n1
+[1;34m[ИНФО][0m Разметка диска /dev/nvme0n1 в стиле GPT...
+  [1;36m[dry-run][0m swapoff -a
+  [1;36m[dry-run][0m umount /dev/nvme0n1p1
+  [1;36m[dry-run][0m umount /dev/nvme0n1p2
+  [1;36m[dry-run][0m umount /dev/nvme0n1p3
+  [1;36m[dry-run][0m umount /dev/nvme0n1p4
+  [1;36m[dry-run][0m umount /dev/nvme0n1p5
+  [1;36m[dry-run][0m umount /dev/nvme0n1p6
+  [1;36m[dry-run][0m umount /dev/nvme0n1p7
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mklabel gpt
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart EFI fat32 1MiB 501MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 1 boot on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 1 esp on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart Microsoft reserved partition 501MiB 517MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 2 msftres on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart Windows ntfs 517MiB 256517MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 3 msftdata on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart Recovery ntfs 256517MiB 257517MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 4 hidden on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 4 diag on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart SHARED 257517MiB 359917MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 5 msftdata on
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart UbuntuRoot ext4 359917MiB 513517MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart UbuntuHome ext4 513517MiB 100%
+  [1;36m[dry-run][0m partprobe /dev/nvme0n1
+  [1;36m[dry-run][0m sleep 2
+[1;32m[УСПЕХ][0m Таблица разделов успешно создана!
+[1;34m[ИНФО][0m Форматирование разделов...
+  [1;36m[dry-run][0m mkfs.fat -F32 -n EFI /dev/nvme0n1p1
+  [1;36m[dry-run][0m mkfs.ntfs -f -L Windows /dev/nvme0n1p3
+  [1;36m[dry-run][0m mkfs.ntfs -f -L Recovery /dev/nvme0n1p4
+  [1;36m[dry-run][0m mkfs.exfat -L SHARED /dev/nvme0n1p5
+  [1;36m[dry-run][0m mkfs.ext4 -F -L UbuntuRoot /dev/nvme0n1p6
+  [1;36m[dry-run][0m mkfs.ext4 -F -L UbuntuHome /dev/nvme0n1p7
+[1;32m[УСПЕХ][0m Все файловые системы отформатированы!
+[1;33m[ВНИМАНИЕ][0m Windows ISO не найден или каталог не доступен на запись — autounattend.xml будет создан в /tmp/deploy-baremetal (скопируйте его рядом с Windows ISO).
+  [1;36m[dry-run][0m sed-подстановка /tmp/deploy-baremetal/templates/unattend.xml.template → /tmp/deploy-baremetal/autounattend.xml
+  [1;36m[dry-run][0m (USERNAME=asv-spb, HOSTNAME=workstation, Windows-раздел=3, index образа=1, TZ=Russian Standard Time)
+
+[1;34m[ИНФО][0m Диск подготовлен. Дальнейший поток установки:
+[1;34m[ИНФО][0m   1) Перезагрузитесь и загрузите Windows ISO с Ventoy — autounattend.xml
+[1;34m[ИНФО][0m      поставит Windows на раздел C: (раздел 3) без запросов.
+[1;34m[ИНФО][0m   2) После установки Windows снова загрузите Live-среду и выполните:
+[1;34m[ИНФО][0m      sudo bash /tmp/deploy-baremetal/deploy.sh --reinstall-ubuntu   # Ubuntu + GRUB с os-prober последним
+
+[1;32m[1m======================================================================[0m
+[1;32m[1m 🎉 ВСЕ ОПЕРАЦИИ УСПЕШНО ЗАВЕРШЕНЫ![0m
+[1;32m[1m======================================================================[0m
+Компьютер готов к работе. Извлеките Live-флешку и перезагрузитесь.
