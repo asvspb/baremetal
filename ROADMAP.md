@@ -69,7 +69,7 @@
 
 - [x] **T3.1 (S)** `make-boot-usb.sh:272` — в строке «Чтение» печатать `dur_r_ms`
       (сейчас `dur_w_ms` — копипаста).
-- [ ] **T3.2 (S)** `split-home.sh:247` — `rm -rf dir/.*` заменить на
+- [x] **T3.2 (S)** `split-home.sh:247` — `rm -rf dir/.*` заменить на
       `find "$MNT_ROOT/home" -mindepth 1 -delete` (SC2115).
 - [ ] **T3.3 (S)** `make-boot-usb.sh` `ensure_ventoy_tool`: убрать блуждание
       `find /home /tmp` — всегда скачивать закреплённую версию в `/tmp`.

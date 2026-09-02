@@ -244,7 +244,7 @@ if ! (( DRY )); then
     success "Данные успешно скопированы на раздел p8!"
 
     info "Очистка старой папки /home на системном разделе p7 (освобождение места)..."
-    rm -rf "$MNT_ROOT/home/"* "$MNT_ROOT/home/".* 2>/dev/null || true
+    find "$MNT_ROOT/home" -mindepth 1 -delete
 
     NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
     info "Обновление /etc/fstab установленной системы (UUID: $NEW_HOME_UUID)..."
