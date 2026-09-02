@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# stub: lsblk — эмуляция диска/разделов по TEST-SPEC §6 (режимы по аргументам)
+if [[ -n "${STUB_LOG:-}" ]]; then
+    mkdir -p "$STUB_LOG"
+    printf '%s\n' "lsblk $* [cwd=$PWD]" >> "$STUB_LOG/lsblk.log"
+fi
+args="$*"
+case "$args" in
+    *-dpno\ NAME,SIZE,MODEL,TRAN*)
+        # список дисков; строки задаёт STUB_LSBLK_DISKS (по умолчанию — флешка 32G)
+        printf '%s\n' "${STUB_LSBLK_DISKS:-/dev/sdb    32G FakeStick usb}"
+        ;;
+    *-b\ -dno\ SIZE*|*-bdo\ SIZE*|*-b\ -dno*)
+        printf '%s\n' "${STUB_LSBLK_SIZE:-34359738368}"
+        ;;
+    *-lno\ NAME*)
+        # имена разделов (без полного пути) для umount-цикла deploy.sh
+        if [[ -n "${STUB_LSBLK_PARTS:-}" ]]; then
+            printf '%s\n' "$STUB_LSBLK_PARTS"
+        fi
+        ;;
+    *-npo\ NAME*|*-rnpo\ NAME*|*-nplo\ NAME*)
+        # полные пути разделов для бэкапа make-boot-usb.sh
+        if [[ -n "${STUB_LSBLK_PARTS_FULL:-}" ]]; then
+            printf '%s\n' "$STUB_LSBLK_PARTS_FULL"
+        fi
+        ;;
+    *-no\ FSTYPE*)
+        printf '%s\n' "${STUB_LSBLK_FSTYPE:-}"
+        ;;
+    *-no\ LABEL*)
+        printf '%s\n' "${STUB_LSBLK_LABEL:-}"
+        ;;
+    *)
+        # карта диска и прочие запросы — пустой вывод
+        :
+        ;;
+esac
+exit 0

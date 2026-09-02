@@ -2,3 +2,5 @@
 parttable-*
 usb_backup_*
 *.log
+tests/.deps/
+tests/stubs/bin/

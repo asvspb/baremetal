@@ -87,11 +87,11 @@ check_sh() {
 
 while IFS= read -r -d '' file; do
     check_ps1 "$file"
-done < <(find "$ROOT_DIR" -name '*.ps1' -type f -print0)
+done < <(find "$ROOT_DIR" -name '*.ps1' -type f -not -path '*/.deps/*' -print0)
 
 while IFS= read -r -d '' file; do
     check_sh "$file"
-done < <(find "$ROOT_DIR" -name '*.sh' -type f -print0)
+done < <(find "$ROOT_DIR" -name '*.sh' -type f -not -path '*/.deps/*' -not -path '*/stubs/bin/*' -print0)
 
 if (( failures > 0 )); then
     echo "check-files: найдено ошибок: $failures" >&2

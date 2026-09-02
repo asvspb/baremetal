@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# stub: df — режимы: -T (тип ФС для choose_backup_dir), -Pk (свободное место
+# для check_backup_space). Управление: STUB_DF_TYPE, STUB_DF_AVAIL_KB.
+if [[ -n "${STUB_LOG:-}" ]]; then
+    mkdir -p "$STUB_LOG"
+    printf '%s\n' "df $* [cwd=$PWD]" >> "$STUB_LOG/df.log"
+fi
+args="$*"
+case "$args" in
+    *-T*)
+        printf 'Filesystem Type\n%s %s\n' "${STUB_DF_PATH:-tmpfs-path}" "${STUB_DF_TYPE:-ext4}"
+        ;;
+    *-Pk*|*-P*)
+        printf 'Filesystem 1024-blocks Used Available Capacity Mounted on\n%s %s %s %s 1%% %s\n' \
+            "${STUB_DF_DEV:-/dev/stub}" "${STUB_DF_TOTAL_KB:-999999999}" 0 "${STUB_DF_AVAIL_KB:-999999999}" "${STUB_DF_MOUNT:-/tmp}"
+        ;;
+    *)
+        :
+        ;;
+esac
+exit 0

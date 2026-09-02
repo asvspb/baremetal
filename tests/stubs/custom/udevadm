@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# stub: udevadm — свойство ID_BUS для detect_disk; управляется STUB_UDEVADM_USB_DEVICES
+# (список имён устройств через запятую, которые считаются USB; прочие — не usb)
+if [[ -n "${STUB_LOG:-}" ]]; then
+    mkdir -p "$STUB_LOG"
+    printf '%s\n' "udevadm $* [cwd=$PWD]" >> "$STUB_LOG/udevadm.log"
+fi
+dev=""
+prev=""
+for a in "$@"; do
+    [[ "$prev" == "-n" ]] && dev="$a"
+    prev="$a"
+done
+base="${dev##*/}"
+usb_list=",${STUB_UDEVADM_USB_DEVICES:-},"
+if [[ ",$usb_list," == *",$base,"* ]]; then
+    echo "ID_BUS=usb"
+else
+    echo "ID_BUS=pci"
+fi
+exit 0

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# stub: cp — прозрачный пропуск к реальному /bin/cp; режимы:
+#   STUB_CP_FAIL=1     → всегда сбой (тесты бэкапа I-M3)
+#   STUB_CP_NOTHING=1  → успех без действия (I-M4: сверка найдёт пропажу файлов)
+if [[ -n "${STUB_LOG:-}" ]]; then
+    mkdir -p "$STUB_LOG"
+    printf '%s\n' "cp $* [cwd=$PWD]" >> "$STUB_LOG/cp.log"
+fi
+if [[ "${STUB_CP_FAIL:-0}" == "1" ]]; then
+    exit 1
+fi
+if [[ "${STUB_CP_NOTHING:-0}" == "1" ]]; then
+    exit 0
+fi
+exec /bin/cp "$@"

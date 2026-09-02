@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# ЗАПРЕЩЁННАЯ заглушка (TEST-SPEC §6): dd в тестах не исполняется НИКОГДА.
+if [[ -n "${STUB_LOG:-}" ]]; then
+    mkdir -p "$STUB_LOG"
+    printf '%s\n' "dd $* [cwd=$PWD]" >> "$STUB_LOG/dd.log"
+fi
+echo "STUB-DD-ЗАПРЕЩЁН: попытка вызова dd в тесте: $*" >&2
+exit 1
