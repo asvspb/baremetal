@@ -119,6 +119,35 @@
                     <PlainText>true</PlainText>
                 </Password>
             </AutoLogon>
+            <FirstLogonCommands>
+                <!-- Телеметрия: минимум для Home/Pro (уровень 0/Security доступен только Enterprise/Education) -->
+                <SynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <CommandLine>reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v AllowTelemetry /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable Telemetry</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <CommandLine>reg add "HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection" /v DoNotShowFeedbackNotifications /t REG_DWORD /d 1 /f</CommandLine>
+                    <Description>Disable Feedback Notifications</Description>
+                </SynchronousCommand>
+                <!-- Реклама и «рекомендации»: Win10 (ContentDeliveryManager) + Win11 (Start_IrisRecommendations) -->
+                <SynchronousCommand wcm:action="add">
+                    <Order>3</Order>
+                    <CommandLine>reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SystemPaneSuggestionsEnabled /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable Start Suggestions (Win10)</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>4</Order>
+                    <CommandLine>reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" /v SilentInstalledAppsEnabled /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable Silent App Installs</Description>
+                </SynchronousCommand>
+                <SynchronousCommand wcm:action="add">
+                    <Order>5</Order>
+                    <CommandLine>reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f</CommandLine>
+                    <Description>Disable Start Recommendations (Win11)</Description>
+                </SynchronousCommand>
+            </FirstLogonCommands>
         </component>
         <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <InputLocale>0419:00000419;0409:00000409</InputLocale>

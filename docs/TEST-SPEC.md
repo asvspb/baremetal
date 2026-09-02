@@ -184,6 +184,7 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 
 - M-1: `check-files.sh` падает на файле с BOM-нарушением и на `$x:` (синтетика) — т.е. сам детектор жив.
 - M-2: все плейсхолдеры `__[A-Z_]+__` из templates имеют sed-подстановку в deploy.sh (grep-соответствие) — защита от забытых заглушек.
+- M-3: `templates/unattend.xml.template` — well-formed (`xmllint --noout`), содержит `<FirstLogonCommands>` и `AllowTelemetry`; без хрупких счётчиков Order.
 
 ## 8. Раннер и интеграция
 

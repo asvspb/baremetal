@@ -5,6 +5,7 @@ load 'helpers'
 # Метатесты (§7.7): детекторы и соответствие шаблон↔подстановка.
 # M-1: check-files.sh ловит нарушения (BOM, $x:, CRLF).
 # M-2: каждый плейсхолдер шаблона имеет sed-подстановку в deploy.sh.
+# M-3: шаблон unattend — well-formed XML, FirstLogonCommands на месте.
 # ==============================================================================
 
 make_ps1_fixture() {
@@ -71,4 +72,15 @@ make_ps1_fixture() {
         grep -qF "$ph" "${REPO_DIR}/templates/unattend.xml.template" || \
             bats::fail "deploy.sh подставляет ${ph}, которого нет в шаблоне"
     done <<<"$used"
+}
+
+@test "M-3: unattend.xml.template — well-formed XML + FirstLogonCommands (телеметрия)" {
+    local tpl="${REPO_DIR}/templates/unattend.xml.template"
+    if command -v xmllint >/dev/null 2>&1; then
+        xmllint --noout "$tpl"
+    else
+        skip "xmllint недоступен"
+    fi
+    grep -q '<FirstLogonCommands>' "$tpl" || bats::fail "нет <FirstLogonCommands> в шаблоне"
+    grep -q 'AllowTelemetry' "$tpl" || bats::fail "нет AllowTelemetry (телеметрия) в шаблоне"
 }

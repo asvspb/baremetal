@@ -305,7 +305,7 @@ L-T3, I-M6. В `docs/TEST-SPEC.md` §11 (ручной чек-лист) допо�
 
 ## Чек-лист выполнения
 
-- [ ] W1 — FirstLogonCommands: телеметрия + реклама (orders 1–5)
+- [x] W1 — FirstLogonCommands: телеметрия + реклама (orders 1–5)
 - [ ] W2 — bloatware через provisioned+AllUsers (order 6, лог)
 - [ ] W3 — WIN_IMAGE_INDEX документирован в deploy.conf
 - [ ] W4 — самоочистка Panther (order 7) + напоминания в deploy.sh и README
