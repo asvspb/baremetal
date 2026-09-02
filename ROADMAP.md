@@ -62,7 +62,7 @@
 - [x] **T2.5 (M)** `make-boot-usb.sh`: копировать пакет на раздел данных
       (`split-home.sh`, `deploy.sh`, `deploy.conf`, `templates/`) — как в ps1-версии;
       устранить расхождение с README.
-- [ ] **T2.6 (S)** `deploy.conf`: `WIN_PASSWORD` (по умолчанию пусто) +
+- [x] **T2.6 (S)** `deploy.conf`: `WIN_PASSWORD` (по умолчанию пусто) +
       подстановка в шаблон unattend вместо жёсткого пустого пароля.
 
 ## Фаза 3 — Полировка

@@ -131,6 +131,7 @@ else
     SHARED_FSTYPE="exfat"
     USERNAME="asv-spb"
     HOSTNAME="workstation"
+    WIN_PASSWORD=""
     TIMEZONE="Europe/Moscow"
     DEFAULT_LOCALE="ru_RU.UTF-8"
     ENABLE_UTC_TIME=1
@@ -398,10 +399,16 @@ generate_autounattend() {
     fi
 
     info "Генерация autounattend.xml (DiskConfiguration под нашу разметку, WillWipeDisk=false)..."
+    # Пароль вставляется в XML — сначала экранируем XML-спецсимволы, затем
+    # спецсимволы sed (& и разделитель), чтобы подстановка была безопасной.
+    local pwd_xml pwd_esc
+    pwd_xml=$(printf '%s' "$WIN_PASSWORD" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+    pwd_esc=$(printf '%s' "$pwd_xml" | sed 's/[&/\]/\\&/g')
     if ! sed -e "s/__USERNAME__/${USERNAME}/g" \
              -e "s/__HOSTNAME__/${HOSTNAME}/g" \
              -e "s/__WIN_PARTITION_ID__/${win_part_id}/g" \
              -e "s/__WIN_IMAGE_INDEX__/${img_index}/g" \
+             -e "s/__WIN_PASSWORD__/${pwd_esc}/g" \
              -e "s/__WIN_TIMEZONE__/$(iana_to_windows_tz "$TIMEZONE")/g" \
              "$template" > "$out_file"; then
         die "Не удалось сгенерировать autounattend.xml: $out_file"

@@ -105,7 +105,7 @@
                         <DisplayName>__USERNAME__</DisplayName>
                         <Group>Administrators</Group>
                         <Password>
-                            <Value></Value>
+                            <Value>__WIN_PASSWORD__</Value>
                             <PlainText>true</PlainText>
                         </Password>
                     </LocalAccount>
@@ -115,7 +115,7 @@
                 <Enabled>true</Enabled>
                 <Username>__USERNAME__</Username>
                 <Password>
-                    <Value></Value>
+                    <Value>__WIN_PASSWORD__</Value>
                     <PlainText>true</PlainText>
                 </Password>
             </AutoLogon>
