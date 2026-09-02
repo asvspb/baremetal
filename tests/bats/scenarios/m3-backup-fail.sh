@@ -7,7 +7,8 @@ scenario_init usb
 source "${REPO_DIR}/make-boot-usb.sh" >/dev/null 2>&1
 export STUB_DF_TYPE="ext4"
 export STUB_DU_BYTES="8000000"
-export STUB_LSBLK_PARTS_FULL="$(printf '/dev/fakedisk1\n/dev/fakedisk3')"
+STUB_LSBLK_PARTS_FULL="$(printf '/dev/fakedisk1\n/dev/fakedisk3')"
+export STUB_LSBLK_PARTS_FULL
 TARGET_DISK="/dev/fakedisk"
 DO_RESTORE=0
 partition_fill="${SCEN_TMP}/partdata"

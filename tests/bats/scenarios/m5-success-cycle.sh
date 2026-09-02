@@ -33,6 +33,7 @@ VSTUB
 chmod +x "$VENTOY_DIR/Ventoy2Disk.sh"
 rc=0
 out=$(printf 'ДА\nn\n' | execute_partitioning 2>&1) || rc=$?
+printf '%s\n' "$out" > "${SCEN_TMP}/execute_partitioning.out"
 echo "RC=$rc"
 # 1) разметка выполнялась: parted и Ventoy2Disk вызывались
 [[ -f "$STUB_LOG/parted.log" ]] && echo "PARTED-CALLED"
