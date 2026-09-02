@@ -416,6 +416,46 @@ function Install-XenlismTheme {
     }
 }
 
+# Сверка восстановления: каждый файл из $BackupRoot должен присутствовать на
+# разделе $DestRoot по тому же относительному пути и с тем же размером.
+# Возвращает $true, если все файлы бэкапа восстановлены корректно.
+function Test-BackupTreeMatch {
+    param(
+        [Parameter(Mandatory=$true)][string]$BackupRoot,
+        [Parameter(Mandatory=$true)][string]$DestRoot,
+        [Parameter(Mandatory=$true)][string]$Label
+    )
+    $srcFiles = @(Get-ChildItem -Path $BackupRoot -Recurse -File -Force -ErrorAction SilentlyContinue)
+    if ($srcFiles.Count -eq 0) {
+        Write-Log "Сверка $Label: в бэкапе нет файлов — пропуск." "WARN"
+        return $true
+    }
+    $totalCount = $srcFiles.Count
+    $totalBytes = ($srcFiles | Measure-Object -Property Length -Sum).Sum
+    $missingCount = 0
+    $mismatchCount = 0
+    foreach ($src in $srcFiles) {
+        $rel = $src.FullName.Substring($BackupRoot.Length).TrimStart('\')
+        $destPath = Join-Path $DestRoot $rel
+        if (-not (Test-Path -LiteralPath $destPath)) {
+            Write-Log "Сверка $Label: отсутствует после восстановления: $rel" "WARN"
+            $missingCount++
+            continue
+        }
+        $destSize = (Get-Item -LiteralPath $destPath -Force).Length
+        if ($destSize -ne $src.Length) {
+            Write-Log "Сверка $Label: размер не совпадает: $rel (бэкап $($src.Length), флешка $destSize)" "WARN"
+            $mismatchCount++
+        }
+    }
+    if ($missingCount -gt 0 -or $mismatchCount -gt 0) {
+        Write-Log "Сверка $Label НЕ пройдена: в бэкапе $totalCount файлов ($totalBytes байт), отсутствует $missingCount, размер не совпал у $mismatchCount." "ERROR"
+        return $false
+    }
+    Write-Log "Сверка $Label пройдена: $totalCount файлов, $totalBytes байт совпадают с бэкапом." "SUCCESS"
+    return $true
+}
+
 try {
     # ------------------------------------------------------------------------------
     # 1. Поиск и выбор USB-накопителя
@@ -577,6 +617,18 @@ try {
         if ([string]::IsNullOrWhiteSpace($ansB) -or $ansB -match '^[YyДд]') {
             $doRestore = $true
             Write-Log "Пользователь подтвердил авто-бэкап файлов (Объем: $totalMB МБ, Объектов: $($foundItems.Count))." "INFO"
+
+            # Проверка свободного места на диске %TEMP% (Get-PSDrive): нужно >= объёма данных x1.1
+            $backupDriveLetter = Split-Path -Qualifier $env:TEMP -ErrorAction SilentlyContinue
+            if (-not $backupDriveLetter) { $backupDriveLetter = "C:" }
+            $backupDriveLetter = $backupDriveLetter.TrimEnd(':')
+            $backupDrive = Get-PSDrive -Name $backupDriveLetter -ErrorAction Stop
+            $needBytes = [long]($totalBackupBytes * 1.1)
+            if ($backupDrive.Free -lt $needBytes) {
+                throw "Недостаточно места для бэкапа на диске ${backupDriveLetter}: нужно ~$([math]::Round($needBytes / 1MB, 2)) МБ, свободно $([math]::Round($backupDrive.Free / 1MB, 2)) МБ. Переразметка отменена."
+            }
+            Write-Log "Свободного места для бэкапа достаточно: нужно ~$([math]::Round($needBytes / 1MB, 2)) МБ, свободно $([math]::Round($backupDrive.Free / 1MB, 2)) МБ." "DEBUG"
+
             New-Item -Path "$backupDir\iso" -ItemType Directory -Force | Out-Null
             New-Item -Path "$backupDir\data" -ItemType Directory -Force | Out-Null
             Write-Host "Копирование файлов во временное хранилище на ПК..." -ForegroundColor Cyan
@@ -590,11 +642,19 @@ try {
                         if ($item.Extension -match '^\.(iso|img|vhd|wim)$') {
                             Write-Host "  • 📀 Сохранение образа: $($item.Name)..." -ForegroundColor Gray
                             Write-Log "Бэкап образа: $($item.FullName) -> $backupDir\iso\" "DEBUG"
-                            Copy-Item -Path $item.FullName -Destination "$backupDir\iso\" -Recurse -Force -ErrorAction SilentlyContinue
+                            try {
+                                Copy-Item -Path $item.FullName -Destination "$backupDir\iso\" -Recurse -Force
+                            } catch {
+                                throw "Сбой копирования образа '$($item.Name)' в бэкап: $($_.Exception.Message). Переразметка отменена."
+                            }
                         } else {
                             Write-Host "  • 📁 Сохранение данных: $($item.Name)..." -ForegroundColor Gray
                             Write-Log "Бэкап данных: $($item.FullName) -> $backupDir\data\" "DEBUG"
-                            Copy-Item -Path $item.FullName -Destination "$backupDir\data\" -Recurse -Force -ErrorAction SilentlyContinue
+                            try {
+                                Copy-Item -Path $item.FullName -Destination "$backupDir\data\" -Recurse -Force
+                            } catch {
+                                throw "Сбой копирования данных '$($item.Name)' в бэкап: $($_.Exception.Message). Переразметка отменена."
+                            }
                         }
                     }
                 }
@@ -1003,6 +1063,8 @@ try {
         Write-Host "  🔄 ВОССТАНОВЛЕНИЕ СОХРАНЕННЫХ ФАЙЛОВ НА НАКОПИТЕЛЬ:" -ForegroundColor Cyan
         Write-Host "======================================================================" -ForegroundColor Cyan
 
+        $restoreFailed = $false
+
         # 1. ISO в раздел 1
         if ($p1 -and $p1.DriveLetter -and (Test-Path "$backupDir\iso")) {
             $isoFiles = Get-ChildItem -Path "$backupDir\iso" -Force -ErrorAction SilentlyContinue
@@ -1011,7 +1073,16 @@ try {
                 foreach ($f in $isoFiles) {
                     Write-Host "  ➔ Восстановление $($f.Name)..." -ForegroundColor Gray
                     Write-Log "Восстановление образа: $($f.FullName) -> $($p1.DriveLetter):\" "DEBUG"
-                    Copy-Item -Path $f.FullName -Destination "$($p1.DriveLetter):\" -Recurse -Force -ErrorAction SilentlyContinue
+                    try {
+                        Copy-Item -Path $f.FullName -Destination "$($p1.DriveLetter):\" -Recurse -Force
+                    } catch {
+                        Write-Log "Сбой восстановления образа $($f.Name): $($_.Exception.Message)" "ERROR"
+                        $restoreFailed = $true
+                        break
+                    }
+                }
+                if (-not $restoreFailed -and -not (Test-BackupTreeMatch -BackupRoot "$backupDir\iso" -DestRoot "$($p1.DriveLetter):\" -Label "ISO-образы")) {
+                    $restoreFailed = $true
                 }
             }
         }
@@ -1024,19 +1095,35 @@ try {
             $destLabel = $labelP1
         }
 
-        if ($destPart -and $destPart.DriveLetter -and (Test-Path "$backupDir\data")) {
+        if (-not $restoreFailed -and $destPart -and $destPart.DriveLetter -and (Test-Path "$backupDir\data")) {
             $dataFiles = Get-ChildItem -Path "$backupDir\data" -Force -ErrorAction SilentlyContinue
             if ($dataFiles) {
                 Write-Host "• Перенос документов и пользовательских данных на Раздел [$destLabel] ($($destPart.DriveLetter):)..." -ForegroundColor Cyan
                 foreach ($f in $dataFiles) {
                     Write-Host "  ➔ Восстановление $($f.Name)..." -ForegroundColor Gray
                     Write-Log "Восстановление данных: $($f.FullName) -> $($destPart.DriveLetter):\" "DEBUG"
-                    Copy-Item -Path $f.FullName -Destination "$($destPart.DriveLetter):\" -Recurse -Force -ErrorAction SilentlyContinue
+                    try {
+                        Copy-Item -Path $f.FullName -Destination "$($destPart.DriveLetter):\" -Recurse -Force
+                    } catch {
+                        Write-Log "Сбой восстановления данных $($f.Name): $($_.Exception.Message)" "ERROR"
+                        $restoreFailed = $true
+                        break
+                    }
+                }
+                if (-not $restoreFailed -and -not (Test-BackupTreeMatch -BackupRoot "$backupDir\data" -DestRoot "$($destPart.DriveLetter):\" -Label "Данные")) {
+                    $restoreFailed = $true
                 }
             }
         }
 
-        Remove-Item $backupDir -Recurse -Force -ErrorAction SilentlyContinue
+        # Временную копию удаляем только после успешной сверки восстановления
+        if ($restoreFailed) {
+            Write-Log "Восстановление завершено с ошибками. Резервная копия СОХРАНЕНА: $backupDir" "WARN"
+            Write-Host "`n⚠️ Восстановление завершено с ошибками. Резервная копия НЕ удалена: $backupDir" -ForegroundColor Yellow
+            throw "Восстановление файлов не прошло проверку. Резервная копия сохранена: $backupDir"
+        }
+
+        Remove-Item $backupDir -Recurse -Force
         Write-Log "Все сохраненные файлы успешно возвращены на накопитель. Временный каталог $backupDir удален." "SUCCESS"
         Write-Host "`n🎉 Все сохраненные файлы успешно возвращены на накопитель!" -ForegroundColor Green
     }
