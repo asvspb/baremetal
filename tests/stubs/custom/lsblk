@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # stub: lsblk — эмуляция диска/разделов по TEST-SPEC §6 (режимы по аргументам)
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "lsblk $* [cwd=$PWD]" >> "$STUB_LOG/lsblk.log"
 fi
 args="$*"

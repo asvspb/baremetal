@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # stub: curl — не качает: при -o <файл> создаёт пустышку, иначе успех
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "curl $* [cwd=$PWD]" >> "$STUB_LOG/curl.log"
 fi
 prev=""

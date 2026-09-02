@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# stub: du — печатает STUB_DU_BYTES (объём «данных на флешке» для бэкапа)
+if [[ -n "${STUB_LOG:-}" && -d "${STUB_LOG:-}" ]]; then
+    printf '%s\n' "du $* [cwd=$PWD]" >> "$STUB_LOG/du.log"
+fi
+printf '%s\n' "${STUB_DU_BYTES:-0}"
+exit 0

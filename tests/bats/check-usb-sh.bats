@@ -2,12 +2,12 @@
 load 'helpers'
 
 # ==============================================================================
-# L2/L3: make-boot-usb.sh — юниты (U-M1) и интеграция на заглушках (T3).
-# Source безопасен: main под guard; заглушки в PATH отключают установку
-# пакетов на верхнем уровне (command -v находит стабы).
+# L2/L3: make-boot-usb.sh — юниты (U-M1) и интеграция на заглушках (I-M1..I-M8).
+# Целевые «диски» в L3 — несуществующие /dev/fakedisk*; каждый критический
+# сценарий дополнительно проверяет, что мутирующие команды не вызывались.
 # ==============================================================================
 
-# source make-boot-usb.sh в изолированном bash с заглушками; доп. код — аргументом
+# source make-boot-usb.sh в изолированном bash с заглушками в PATH
 usb_run() {
     local extra="$1"
     bash -c "
@@ -19,6 +19,10 @@ usb_run() {
         ${extra}
     "
 }
+
+SCEN="${REPO_DIR}/tests/bats/scenarios"
+
+# ---------- L2: чистые функции ----------
 
 @test "U-M1: verify_restored_tree — полное совпадение -> rc 0" {
     local bak dest
@@ -51,4 +55,108 @@ usb_run() {
     assert_failure
     assert_output --partial "не найден файл"
     rm -rf "$bak" "$dest"
+}
+
+# ---------- L3: интеграция на заглушках ----------
+
+@test "I-M1: choose_backup_dir — tmpfs -> /var/tmp (Live-среда)" {
+    run timeout 60 bash "${SCEN}/m1-backup-dir.sh" tmpfs-default
+    assert_success
+    assert_output --partial "RESULT_DIR=/var/tmp/usb_backup_"
+    assert_output --partial "OK"
+}
+
+@test "I-M1: choose_backup_dir — tmpfs + введённый пользователем путь" {
+    run timeout 60 bash "${SCEN}/m1-backup-dir.sh" tmpfs-custom
+    assert_success
+    assert_output --partial "OK"
+}
+
+@test "I-M1: choose_backup_dir — обычный /tmp (не tmpfs) -> /tmp/usb_backup_" {
+    run timeout 60 bash "${SCEN}/m1-backup-dir.sh" ext4-default
+    assert_success
+    assert_output --partial "RESULT_DIR=/tmp/usb_backup_"
+    assert_output --partial "OK"
+}
+
+@test "I-M2: check_backup_space — мало места -> die ДО копирования" {
+    run timeout 60 bash "${SCEN}/m2-backup-space.sh" little
+    assert_failure
+    assert_output --partial "Недостаточно места для бэкапа"
+    assert_output --partial "NO-MUTATIONS"
+}
+
+@test "I-M2: check_backup_space — места достаточно -> rc 0" {
+    run timeout 60 bash "${SCEN}/m2-backup-space.sh" enough
+    assert_success
+    assert_output --partial "RC=0"
+}
+
+@test "I-M3 КРИТИЧЕСКИЙ: сбой rsync на бэкапе -> die, флешка НЕ тронута" {
+    run timeout 60 bash "${SCEN}/m3-backup-fail.sh" rsync-fail
+    assert_failure
+    assert_output --partial "Сбой копирования данных с раздела"
+    assert_output --partial "Бэкап сохранен"
+    assert_output --partial "BACKUP-KEPT"
+    assert_output --partial "USB-UNTOUCHED"
+    refute_output --partial "USB-TOUCHED"
+}
+
+@test "I-M3 КРИТИЧЕСКИЙ: сбой cp (ISO) на бэкапе -> die, флешка НЕ тронута" {
+    run timeout 60 bash "${SCEN}/m3-backup-fail.sh" cp-fail
+    assert_failure
+    assert_output --partial "Сбой копирования ISO-образов с раздела"
+    assert_output --partial "Бэкап сохранен"
+    assert_output --partial "BACKUP-KEPT"
+    assert_output --partial "USB-UNTOUCHED"
+}
+
+@test "I-M4 КРИТИЧЕСКИЙ: сверка ISO не сошлась -> бэкап НЕ удалён" {
+    run timeout 60 bash "${SCEN}/m4-verify-mismatch.sh" iso
+    assert_failure
+    assert_output --partial "ISO-образы восстановлены с ошибками"
+    assert_output --partial "BACKUP-KEPT"
+}
+
+@test "I-M4 КРИТИЧЕСКИЙ: сверка данных не сошлась -> бэкап НЕ удалён" {
+    run timeout 60 bash "${SCEN}/m4-verify-mismatch.sh" data
+    assert_failure
+    assert_output --partial "Данные восстановлены с ошибками"
+    assert_output --partial "BACKUP-KEPT"
+}
+
+@test "I-M5: успешный цикл бэкап -> разметка -> восстановление -> бэкап удалён" {
+    run timeout 120 bash "${SCEN}/m5-success-cycle.sh"
+    assert_success
+    assert_output --partial "RC=0"
+    assert_output --partial "PARTED-CALLED"
+    assert_output --partial "VENTOY-CALLED"
+    assert_output --partial "ISO-RESTORED"
+    assert_output --partial "DATA-RESTORED"
+    assert_output --partial "NESTED-RESTORED"
+    assert_output --partial "BACKUP-DELETED"
+}
+
+@test "I-M6: copy_deploy_package кладёт пакет на раздел данных" {
+    run timeout 60 bash "${SCEN}/m6-copy-package.sh"
+    assert_success
+    assert_output --partial "RC=0"
+    assert_output --partial "HAS deploy.sh"
+    assert_output --partial "HAS deploy.conf"
+    assert_output --partial "HAS split-home.sh"
+    assert_output --partial "HAS templates/unattend.xml.template"
+}
+
+@test "I-M7: интерактивная настройка через piped-ввод -> верные параметры" {
+    run timeout 60 bash "${SCEN}/m7-interactive-config.sh"
+    assert_success
+    assert_output --partial "HAS-CONFIG-LINE"
+    assert_output --partial "DATA_FS=exfat VENTOY_SIZE_G=8 LABEL_P1=FD-0 LABEL_P3=DATA-0"
+}
+
+@test "I-M8: защита от nvme — guard присутствует, nvme не предлагается к выбору" {
+    run timeout 60 bash "${SCEN}/m8-nvme-guard.sh"
+    assert_success
+    assert_output --partial "GUARD-STATIC=PRESENT"
+    assert_output --partial "NVME-NOT-OFFERED"
 }

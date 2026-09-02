@@ -2,7 +2,6 @@
 # stub: udevadm — свойство ID_BUS для detect_disk; управляется STUB_UDEVADM_USB_DEVICES
 # (список имён устройств через запятую, которые считаются USB; прочие — не usb)
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "udevadm $* [cwd=$PWD]" >> "$STUB_LOG/udevadm.log"
 fi
 dev=""

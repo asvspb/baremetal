@@ -210,8 +210,17 @@ backup_existing_files() {
             mkdir -p "$tmp_m"
             for part in "${parts[@]}"; do
                 if mount -o ro "$part" "$tmp_m" 2>/dev/null; then
-                    # Копируем ISO/IMG/VHD в папку ISO, остальное в папку DATA
-                    if ! find "$tmp_m" -maxdepth 2 -type f \( -name "*.iso" -o -name "*.img" -o -name "*.vhd" -o -name "*.wim" \) -exec cp -v {} "$BACKUP_DIR/iso/" \;; then
+                    # Копируем ISO/IMG/VHD в папку ISO, остальное в папку DATA.
+                    # ВАЖНО: через while + явный rc у cp — find -exec не возвращает
+                    # ненулевой код при сбое exec-команды, сбой был бы пропущен.
+                    local iso_cp_failed=0
+                    while IFS= read -r -d '' f; do
+                        if ! cp -v "$f" "$BACKUP_DIR/iso/"; then
+                            iso_cp_failed=1
+                            break
+                        fi
+                    done < <(find "$tmp_m" -maxdepth 2 -type f \( -name "*.iso" -o -name "*.img" -o -name "*.vhd" -o -name "*.wim" \) -print0)
+                    if (( iso_cp_failed )); then
                         umount "$tmp_m" 2>/dev/null || true
                         die "Сбой копирования ISO-образов с раздела $part — переразметка отменена. Бэкап сохранен: $BACKUP_DIR"
                     fi

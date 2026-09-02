@@ -31,8 +31,7 @@ mkdir -p "$bin_dir"
 cat > "$bin_dir/$cmd" <<EOF
 #!/usr/bin/env bash
 # auto-generated stub: $cmd (exit=$exit_code) — НЕ редактировать, генерируется make-stub.sh
-if [[ -n "\${STUB_LOG:-}" ]]; then
-    mkdir -p "\$STUB_LOG"
+if [[ -n "\${STUB_LOG:-}" && -d "\${STUB_LOG:-}" ]]; then
     printf '%s\\n' "$cmd \$* [cwd=\$PWD]" >> "\$STUB_LOG/$cmd.log"
 fi
 if [[ -n "$stdout_text" ]]; then

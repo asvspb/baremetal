@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # stub: rsync — прозрачный пропуск к реальному /usr/bin/rsync; STUB_RSYNC_FAIL=1 → сбой
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "rsync $* [cwd=$PWD]" >> "$STUB_LOG/rsync.log"
 fi
 if [[ "${STUB_RSYNC_FAIL:-0}" == "1" ]]; then

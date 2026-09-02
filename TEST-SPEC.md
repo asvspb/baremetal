@@ -210,7 +210,7 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 | T0 | ✅ Рефакторинг guard + golden-файл dry-run | M |
 | T1 | ✅ setup.sh + каркас bats + L0/L1 в раннере | S |
 | T2 | ✅ Юниты U-* (deploy, usb-sh) | M |
-| T3 | Стабы + интеграционные I-M1..I-M8, I-D*, U-D6 | M |
+| T3 | ✅ Стабы + интеграционные I-M1..I-M8, I-D*, U-D6 | M |
 | T4 | Loop-уровень L-T1..L-T3 | M |
 | T5 | E2E dry-run + метатесты + Makefile + pre-commit | S |
 | T6 | (опция) Pester на Windows-машине | M |

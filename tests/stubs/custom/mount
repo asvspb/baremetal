@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# stub: mount — exit 0 + лог; при STUB_MOUNT_FILL=<dir> наполняет точку
+# монтирования ($2) содержимым фикстуры, чтобы «раздел» имел файлы
+if [[ -n "${STUB_LOG:-}" && -d "${STUB_LOG:-}" ]]; then
+    printf '%s\n' "mount $* [cwd=$PWD]" >> "$STUB_LOG/mount.log"
+fi
+mp="${*: -1}"
+if [[ -n "${STUB_MOUNT_FILL:-}" && -d "$STUB_MOUNT_FILL" && -d "$mp" ]] && [[ "$mp" == /tmp/* ]]; then
+    /bin/cp -r "$STUB_MOUNT_FILL/." "$mp/" 2>/dev/null
+fi
+exit 0

@@ -2,7 +2,6 @@
 # stub: df — режимы: -T (тип ФС для choose_backup_dir), -Pk (свободное место
 # для check_backup_space). Управление: STUB_DF_TYPE, STUB_DF_AVAIL_KB.
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "df $* [cwd=$PWD]" >> "$STUB_LOG/df.log"
 fi
 args="$*"

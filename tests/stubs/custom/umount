@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# stub: umount — exit 0 + лог; при STUB_UMOUNT_SAVE=<dir> сохраняет содержимое
+# точки монтирования (последний аргумент), чтобы тест мог проверить результат
+if [[ -n "${STUB_LOG:-}" && -d "${STUB_LOG:-}" ]]; then
+    printf '%s\n' "umount $* [cwd=$PWD]" >> "$STUB_LOG/umount.log"
+fi
+mp="${*: -1}"
+if [[ -n "${STUB_UMOUNT_SAVE:-}" && -d "$mp" && "$mp" == /tmp/* ]]; then
+    /bin/mkdir -p "${STUB_UMOUNT_SAVE}/$(basename "$mp")"
+    /bin/cp -r "$mp/." "${STUB_UMOUNT_SAVE}/$(basename "$mp")/" 2>/dev/null
+fi
+exit 0

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # stub: wget — не качает: пишет локальный файл-пустышку при -O, иначе успех
 if [[ -n "${STUB_LOG:-}" ]]; then
-    mkdir -p "$STUB_LOG"
     printf '%s\n' "wget $* [cwd=$PWD]" >> "$STUB_LOG/wget.log"
 fi
 prev=""
