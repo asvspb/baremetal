@@ -135,7 +135,12 @@ else
     TIMEZONE="Europe/Moscow"
     DEFAULT_LOCALE="ru_RU.UTF-8"
     ENABLE_UTC_TIME=1
+    # Значения DISABLE_FAST_STARTUP / DISABLE_BITLOCKER зашиты в шаблон
+    # templates/unattend.xml.template (Windows Setup отключает Fast Startup и
+    # BitLocker всегда). Переменные читаются скриптом через source deploy.conf.
+    # shellcheck disable=SC2034
     DISABLE_FAST_STARTUP=1
+    # shellcheck disable=SC2034
     DISABLE_BITLOCKER=1
     ENABLE_FSTRIM_TIMER=1
     INSTALL_RESTRICTED_DRIVERS=1
@@ -144,7 +149,6 @@ else
 fi
 
 DRY=0
-FORCE=0
 YES=0
 MODE=""
 

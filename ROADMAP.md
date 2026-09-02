@@ -77,7 +77,7 @@
       (enum нет на .NET < 4.8).
 - [x] **T3.5 (S)** `make-boot-usb.sh:227` — `chown` fallback вместо `asv-spb`
       использовать `${SUDO_USER:-$(logname 2>/dev/null || echo root)}`.
-- [ ] **T3.6 (M)** `shellcheck -S warning` чисто по всем `.sh`
+- [x] **T3.6 (M)** `shellcheck -S warning` чисто по всем `.sh`
       (осознанные отключки — с комментарием `# shellcheck disable=...`).
 - [ ] **T3.7 (S)** `deploy.sh` — `timedatectl` в chroot не работает: заменить на
       установку TZ симлинком (см. T2.4), строку с timedatectl удалить.

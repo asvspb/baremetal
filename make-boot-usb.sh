@@ -598,10 +598,8 @@ execute_partitioning() {
     partprobe "$TARGET_DISK" || true
 
     P1="${TARGET_DISK}1"
-    P2="${TARGET_DISK}2"
     P3="${TARGET_DISK}3"
     [[ -b "${TARGET_DISK}p1" ]] && P1="${TARGET_DISK}p1"
-    [[ -b "${TARGET_DISK}p2" ]] && P2="${TARGET_DISK}p2"
     [[ -b "${TARGET_DISK}p3" ]] && P3="${TARGET_DISK}p3"
 
     # Скрытие и защита EFI раздела (VTOYEFI)
