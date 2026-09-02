@@ -67,7 +67,7 @@
 
 ## Фаза 3 — Полировка
 
-- [ ] **T3.1 (S)** `make-boot-usb.sh:272` — в строке «Чтение» печатать `dur_r_ms`
+- [x] **T3.1 (S)** `make-boot-usb.sh:272` — в строке «Чтение» печатать `dur_r_ms`
       (сейчас `dur_w_ms` — копипаста).
 - [ ] **T3.2 (S)** `split-home.sh:247` — `rm -rf dir/.*` заменить на
       `find "$MNT_ROOT/home" -mindepth 1 -delete` (SC2115).
