@@ -6,6 +6,16 @@ fi
 if [[ "${STUB_RSYNC_FAIL:-0}" == "1" ]]; then
     exit 1
 fi
+if [[ "${STUB_RSYNC_DIFF:-0}" == "1" ]]; then
+    # инъекция расхождения только в сверочный проход: -n может быть склеен
+    # с другими флагами (-aHAXSnS), ищем n среди коротких флагов
+    for a in "$@"; do
+        if [[ "$a" == -* && "$a" != --* && "$a" == *n* ]]; then
+            printf '%s\n' '>f+++++++++ INJECTED-DIFF.txt'
+            exit 0
+        fi
+    done
+fi
 if [[ "${STUB_RSYNC_NOTHING:-0}" == "1" ]]; then
     # успех без действия: verify_restored_tree найдёт пропажу файлов (I-M4)
     exit 0

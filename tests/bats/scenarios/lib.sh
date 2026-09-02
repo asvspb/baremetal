@@ -21,7 +21,7 @@ SCEN_TMP="$(mktemp -d "${TMPDIR:-/tmp}/deploy-test-XXXXXX")"
 # Универсальные заглушки: exit 0 + запись вызова в $STUB_LOG/<cmd>.log
 SCEN_GENERIC_STUBS=(parted mkfs.fat mkfs.ntfs mkfs.exfat mkfs.vfat mkfs.ext4
     mkfs.f2fs mkswap partprobe e2fsck resize2fs sleep fallocate
-    swapoff swapon blkid dosfsck)
+    swapoff swapon blkid dosfsck fstrim)
 
 scenario_cleanup() {
     rm -rf "$SCEN_TMP"

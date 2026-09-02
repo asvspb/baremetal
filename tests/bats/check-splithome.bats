@@ -25,3 +25,38 @@ load 'helpers'
     assert_failure
     assert_output --partial "Скрипт требует прав root"
 }
+
+# ---------- S5: критические пути do_migrate_home (сценарии sh-migrate.sh) ----------
+
+@test "S5 КРИТИЧЕСКИЙ: сбой сверки -> die, старый /home цел, fstab без /home" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-migrate.sh" verify-fail
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "Сверка /home после копирования не сошлась"
+    assert_output --partial "HOME-INTACT"
+    assert_output --partial "FSTAB-WITHOUT-P8"
+    refute_output --partial "FSTAB-HAS-P8"
+    refute_output --partial "HOME-DELETED"
+}
+
+@test "S5: успех -> fstab c UUID p8, старый /home удалён после fstab, порядок верен" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-migrate.sh" success
+    assert_success
+    assert_output --partial "RC=0"
+    assert_output --partial "Сверка пройдена: копия идентична оригиналу."
+    assert_output --partial "FSTAB-HAS-P8"
+    assert_output --partial "FSTAB-BAK-EXISTS"
+    assert_output --partial "PARTTABLE-COPIED"
+    assert_output --partial "HOME-DELETED"
+    assert_output --partial "HOME-EMPTY"
+}
+
+@test "S5 КРИТИЧЕСКИЙ: сбой rsync копии -> die до сверки и fstab" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-migrate.sh" rsync-fail
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "HOME-INTACT"
+    assert_output --partial "FSTAB-WITHOUT-P8"
+    refute_output --partial "FSTAB-HAS-P8"
+    refute_output --partial "Сверка пройдена"
+}

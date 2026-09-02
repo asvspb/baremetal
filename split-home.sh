@@ -176,6 +176,74 @@ check_home_usage() {
     fi
 }
 
+# ------------------------------------------------------------------------------
+# 7. Миграция данных /home на новый раздел p8
+# ------------------------------------------------------------------------------
+
+# Cleanup-ловушка (по образцу cleanup_mounts в deploy.sh): прерывание посреди
+# миграции не оставляет смонтированных p7/p8. Читает глобальные MNT_*,
+# значения проверяются на пустоту.
+cleanup_split() {
+    local mp
+    for mp in "${MNT_HOME:-}" "${MNT_ROOT:-}"; do
+        [[ -n "$mp" ]] || continue
+        if grep -qE "^[^ ]+ $mp " /proc/mounts 2>/dev/null; then
+            umount "$mp" 2>/dev/null || true
+        fi
+    done
+    return 0
+}
+
+do_migrate_home() {
+MNT_ROOT="/tmp/split_root_mnt"
+MNT_HOME="/tmp/split_home_mnt"
+
+info "Монтирование разделов для переноса файлов..."
+run mkdir -p "$MNT_ROOT" "$MNT_HOME"
+run mount "$P7" "$MNT_ROOT"
+run mount "$P8" "$MNT_HOME"
+run fstrim -v "$MNT_HOME" 2>/dev/null || true
+
+if ! (( DRY )); then
+    info "Копирование всех личных данных из /home на раздел p8 (rsync -aHAX)..."
+    rsync -aHAXS --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
+    success "Данные успешно скопированы на раздел p8!"
+
+    # Сверка копии ДО уничтожения оригинала: второй проход rsync в dry-режиме
+    # с itemize. Пустой вывод = деревья идентичны (контент, права, xattr, ACL,
+    # hardlinks). Непустой = die: старый /home НЕ тронут, fstab НЕ изменён.
+    info "Сверка копии с оригиналом (rsync -n --itemize)..."
+    verify_out="$(rsync -aHAXSnS --itemize-changes --out-format='%i %n' \
+        "$MNT_ROOT/home/" "$MNT_HOME/" 2>&1 || true)"
+    if [[ -n "$verify_out" ]]; then
+        die "Сверка /home после копирования не сошлась (первые расхождения):
+$verify_out
+Старый /home НЕ удалён, fstab НЕ изменён. Разберитесь с расхождениями вручную."
+    fi
+    success "Сверка пройдена: копия идентична оригиналу."
+
+    # fstab обновляется ДО удаления старого /home: прерывание между шагами
+    # оставляет максимум "незачищенные старые копии" на p7, а не пустой /home.
+    NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
+    info "Обновление /etc/fstab установленной системы (UUID: $NEW_HOME_UUID)..."
+    cp -a "$MNT_ROOT/etc/fstab" "$MNT_ROOT/etc/fstab.bak-$TS"
+    echo "UUID=${NEW_HOME_UUID}   /home           ext4    defaults          0       2" >> "$MNT_ROOT/etc/fstab"
+    cp "/tmp/parttable-before-split-$TS.bak" "$MNT_ROOT/root/parttable-before-split-$TS.bak"
+    success "Конфигурация fstab обновлена!"
+
+    info "Очистка старой папки /home на системном разделе p7 (освобождение места)..."
+    find "$MNT_ROOT/home" -mindepth 1 -delete
+else
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} rsync -aHAX /tmp/split_root_mnt/home/ /tmp/split_home_mnt/"
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Сверка копии (rsync -n --itemize) ДО изменения fstab и удаления старого /home"
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Добавление UUID p8 в /etc/fstab как /home"
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Очистка старой папки /home на p7 (только ПОСЛЕ обновления fstab)"
+fi
+
+run sync
+run umount "$MNT_HOME"
+run umount "$MNT_ROOT"
+}
 # Основной поток (только при прямом запуске; source в тестах — только определения)
 main() {
     parse_args "$@"
@@ -264,74 +332,6 @@ info "Форматирование p8 в ext4 с меткой UbuntuHome..."
 run mkfs.ext4 -F -L "UbuntuHome" "$P8"
 success "Раздел p8 успешно создан и отформатирован!"
 
-# ------------------------------------------------------------------------------
-# 7. Миграция данных /home на новый раздел p8
-# ------------------------------------------------------------------------------
-
-# Cleanup-ловушка (по образцу cleanup_mounts в deploy.sh): прерывание посреди
-# миграции не оставляет смонтированных p7/p8. Читает глобальные MNT_*,
-# значения проверяются на пустоту.
-cleanup_split() {
-    local mp
-    for mp in "${MNT_HOME:-}" "${MNT_ROOT:-}"; do
-        [[ -n "$mp" ]] || continue
-        if grep -qE "^[^ ]+ $mp " /proc/mounts 2>/dev/null; then
-            umount "$mp" 2>/dev/null || true
-        fi
-    done
-    return 0
-}
-
-do_migrate_home() {
-MNT_ROOT="/tmp/split_root_mnt"
-MNT_HOME="/tmp/split_home_mnt"
-
-info "Монтирование разделов для переноса файлов..."
-run mkdir -p "$MNT_ROOT" "$MNT_HOME"
-run mount "$P7" "$MNT_ROOT"
-run mount "$P8" "$MNT_HOME"
-run fstrim -v "$MNT_HOME" 2>/dev/null || true
-
-if ! (( DRY )); then
-    info "Копирование всех личных данных из /home на раздел p8 (rsync -aHAX)..."
-    rsync -aHAXS --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
-    success "Данные успешно скопированы на раздел p8!"
-
-    # Сверка копии ДО уничтожения оригинала: второй проход rsync в dry-режиме
-    # с itemize. Пустой вывод = деревья идентичны (контент, права, xattr, ACL,
-    # hardlinks). Непустой = die: старый /home НЕ тронут, fstab НЕ изменён.
-    info "Сверка копии с оригиналом (rsync -n --itemize)..."
-    verify_out="$(rsync -aHAXSnS --itemize --out-format='%i %n' \
-        "$MNT_ROOT/home/" "$MNT_HOME/" 2>&1 || true)"
-    if [[ -n "$verify_out" ]]; then
-        die "Сверка /home после копирования не сошлась (первые расхождения):
-$verify_out
-Старый /home НЕ удалён, fstab НЕ изменён. Разберитесь с расхождениями вручную."
-    fi
-    success "Сверка пройдена: копия идентична оригиналу."
-
-    # fstab обновляется ДО удаления старого /home: прерывание между шагами
-    # оставляет максимум "незачищенные старые копии" на p7, а не пустой /home.
-    NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
-    info "Обновление /etc/fstab установленной системы (UUID: $NEW_HOME_UUID)..."
-    cp -a "$MNT_ROOT/etc/fstab" "$MNT_ROOT/etc/fstab.bak-$TS"
-    echo "UUID=${NEW_HOME_UUID}   /home           ext4    defaults          0       2" >> "$MNT_ROOT/etc/fstab"
-    cp "/tmp/parttable-before-split-$TS.bak" "$MNT_ROOT/root/parttable-before-split-$TS.bak"
-    success "Конфигурация fstab обновлена!"
-
-    info "Очистка старой папки /home на системном разделе p7 (освобождение места)..."
-    find "$MNT_ROOT/home" -mindepth 1 -delete
-else
-    echo -e "  ${C_CYAN}[dry-run]${C_RESET} rsync -aHAX /tmp/split_root_mnt/home/ /tmp/split_home_mnt/"
-    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Сверка копии (rsync -n --itemize) ДО изменения fstab и удаления старого /home"
-    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Добавление UUID p8 в /etc/fstab как /home"
-    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Очистка старой папки /home на p7 (только ПОСЛЕ обновления fstab)"
-fi
-
-run sync
-run umount "$MNT_HOME"
-run umount "$MNT_ROOT"
-}
 
 do_migrate_home
 
