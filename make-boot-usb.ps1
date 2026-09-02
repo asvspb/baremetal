@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.3"
+$ScriptVersion = "2026-09-02.4"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -320,9 +320,11 @@ function Run-SpeedTest {
 
         Remove-Item $testFile -Force -ErrorAction SilentlyContinue
 
+        # Файл только что записан самим тестом — ОС отдаёт его из кэша,
+        # поэтому чтение отражает производительность конвейера ОС, не флешки.
         Write-Host "  • ✍️  Запись : $writeSpeed МБ/с ($sizeMB МБ за $([math]::Round($writeSec, 2)) сек)" -ForegroundColor Green
-        Write-Host "  • 📖  Чтение : $readSpeed МБ/с ($sizeMB МБ за $([math]::Round($readSec, 2)) сек)" -ForegroundColor Green
-        Write-Log "Результат замера скорости $title ($path): Запись = $writeSpeed МБ/с, Чтение = $readSpeed МБ/с" "SUCCESS"
+        Write-Host "  • 📖  Чтение (из кэша ОС) : $readSpeed МБ/с ($sizeMB МБ за $([math]::Round($readSec, 2)) сек)" -ForegroundColor Green
+        Write-Log "Результат замера скорости $title ($path): Запись = $writeSpeed МБ/с, Чтение (из кэша ОС) = $readSpeed МБ/с" "SUCCESS"
     }
     catch {
         Write-Log "Ошибка при выполнении теста скорости на $($path): $_" "WARN"
