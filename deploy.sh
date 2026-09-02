@@ -52,6 +52,11 @@ iana_to_windows_tz() {
     esac
 }
 
+# Экранирование для вставки значения в XML-текст (спецсимволы XML).
+xml_escape() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+# Экранирование для правой части sed-замены (&, разделитель и обратный слеш).
+sed_escape() { printf '%s' "$1" | sed 's/[&/\]/\\&/g'; }
+
 # Путь к разделу N диска: для дисков с цифрой на конце (nvme0n1) добавляется "p"
 part_dev() {
     local disk="$1" n="$2"
@@ -413,13 +418,14 @@ generate_autounattend() {
     fi
 
     info "Генерация autounattend.xml (DiskConfiguration под нашу разметку, WillWipeDisk=false)..."
-    # Пароль вставляется в XML — сначала экранируем XML-спецсимволы, затем
-    # спецсимволы sed (& и разделитель), чтобы подстановка была безопасной.
-    local pwd_xml pwd_esc
-    pwd_xml=$(printf '%s' "$WIN_PASSWORD" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-    pwd_esc=$(printf '%s' "$pwd_xml" | sed 's/[&/\]/\\&/g')
-    if ! sed -e "s/__USERNAME__/${USERNAME}/g" \
-             -e "s/__HOSTNAME__/${HOSTNAME}/g" \
+    # Значения вставляются в XML — сначала экранируем XML-спецсимволы, затем
+    # спецсимволы sed (&, разделитель, обратный слеш), чтобы подстановка была безопасной.
+    local user_esc host_esc pwd_esc
+    user_esc=$(sed_escape "$(xml_escape "$USERNAME")")
+    host_esc=$(sed_escape "$(xml_escape "$HOSTNAME")")
+    pwd_esc=$(sed_escape "$(xml_escape "$WIN_PASSWORD")")
+    if ! sed -e "s/__USERNAME__/${user_esc}/g" \
+             -e "s/__HOSTNAME__/${host_esc}/g" \
              -e "s/__WIN_PARTITION_ID__/${win_part_id}/g" \
              -e "s/__WIN_IMAGE_INDEX__/${img_index}/g" \
              -e "s/__WIN_PASSWORD__/${pwd_esc}/g" \

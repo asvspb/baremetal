@@ -130,6 +130,7 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 | U-D5 | L3 | `find_isos` в tmp-каталоге с fixtures → WIN_ISO/UBUNTU_ISO найдены |
 | U-D6 | L3 | `generate_autounattend`: пароли `p&a<b>"c/d`, `//`, пустой → корректное экранирование (grep по выходу); `xmllint --noout` валиден; нет неразрешённых `__[A-Z_]+__` |
 | U-D7 | L3 | отказ без ISO Ubuntu: exit ≠ 0, сообщение про debootstrap |
+| U-D8 | L3 | `generate_autounattend`: USERNAME/HOSTNAME `a&b<c>"d` / `h&ost` → экранированы в `<Name>`/`<ComputerName>`; `xmllint --noout` валиден; нет неразрешённых `__[A-Z_]+__` |
 | I-D1 | L3 | PREP_DISK на стабах: последовательность parted (7 mkpart, esp/msftres/msftdata флаги, MiB-арифметика размеров из conf) и mkfs.* (правильные устройства/метки) |
 | I-D2 | L3 | `GRUB_DISABLE_OS_PROBER=false` дописан перед update-grub (реальный sed на tmp-файле) |
 

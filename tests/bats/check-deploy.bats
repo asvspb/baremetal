@@ -168,3 +168,17 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
         refute_output --partial "FAIL"
     done < <(grep -v '^$' "${REPO_DIR}/tests/fixtures/passwords.txt" || true)
 }
+
+@test "U-D8: generate_autounattend — USERNAME/HOSTNAME со спецсимволами экранируются" {
+    run timeout 120 bash "${SCEN}/d8-escape-user.sh" 'a&b<c>"d' 'h&ost' 'a&amp;b&lt;c&gt;&quot;d' 'h&amp;ost'
+    assert_success
+    assert_output --partial "RC=0"
+    refute_output --partial "FAIL"
+}
+
+@test "U-D8: generate_autounattend — пустые USERNAME/HOSTNAME без плейсхолдеров" {
+    run timeout 120 bash "${SCEN}/d8-escape-user.sh" '' '' '' ''
+    assert_success
+    assert_output --partial "RC=0"
+    refute_output --partial "FAIL"
+}
