@@ -62,3 +62,15 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 2. 🔌 [**`make-boot-usb.ps1`**](file:///home/asv-spb/Dev/deploy-baremetal/make-boot-usb.ps1) — создание загрузочных флешек под Windows.
 3. ⚡ [**`split-home.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/split-home.sh) — безрисковое разделение текущей Ubuntu на корень (200 ГБ) и `/home` (~427 ГБ).
 4. 💻 [**`deploy.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/deploy.sh) — модульный установщик чистых ОС с нуля (Ubuntu + Windows Dual-Boot).
+
+---
+
+## 🪟 Как ставится Windows (вариант A: autounattend.xml + Ventoy)
+
+Windows больше **не** распаковывается из ISO через `wimlib-imagex` (такой способ не создавал загрузчик Windows, и система не стартовала). Вместо этого используется штатный установщик Windows, запущенный загрузкой ISO с флешки Ventoy:
+
+1. **`sudo bash deploy.sh --prep-disk`** — разметка GPT + форматирование всех разделов **без установки ОС**. Скрипт дополнительно генерирует полный `autounattend.xml` (файл кладётся рядом с Windows ISO на флешке): в нём `<DiskConfiguration>` под нашу разметку (`WillWipeDisk=false`, переформатируется только раздел Windows C:), настройки UTC / Fast Startup / BitLocker, локали и OOBE.
+2. **Перезагрузка** → в меню Ventoy выбираем Windows ISO. Установщик автоматически применяет `autounattend.xml`, ставит Windows на раздел C: и сам создаёт загрузчик.
+3. **`sudo bash deploy.sh --reinstall-ubuntu`** — Ubuntu ставится **последней**; GRUB с `os-prober` обнаруживает установленную Windows и создаёт полноценное меню Dual-Boot.
+
+> Старые режимы `--full` (автоматическая распаковка Windows) и `--reinstall-windows` удалены — они заменены этим документированным потоком. `--full` / `-f` оставлен как синоним этапа `--prep-disk`.

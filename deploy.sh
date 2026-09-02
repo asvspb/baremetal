@@ -23,6 +23,9 @@ run()     { if (( DRY )); then echo -e "  ${C_CYAN}[dry-run]${C_RESET} $*"; else
 
 REAL_SOURCE="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
+# Каталог, из которого скрипт реально запущен (флешка). После переноса в RAM
+# SCRIPT_DIR указывает на /tmp, а этот путь нужен для записи autounattend.xml.
+ORIG_SCRIPT_DIR="$SCRIPT_DIR"
 
 # ==============================================================================
 # 🧹 Cleanup-ловушка: при любом завершении скрипта (успех или сбой) отмонтируем
@@ -120,11 +123,22 @@ usage() {
 Использование: sudo bash deploy.sh [РЕЖИМ] [ОПЦИИ]
 
 РЕЖИМЫ:
-  --full, -f             Полная чистая установка с переразметкой всего диска
+  --prep-disk            Разметка GPT + форматирование разделов БЕЗ установки ОС
+                         (готовит диск под Windows 11 + Ubuntu Dual-Boot и
+                         генерирует autounattend.xml для установки Windows)
+  --full, -f             Полный поток подготовки (= --prep-disk): разметка и
+                         форматирование диска под Dual-Boot
   --reinstall-ubuntu     Переустановка только Ubuntu (корень /), сохраняя /home, Windows и Shared
-  --reinstall-windows    Переустановка только Windows (диск C:), сохраняя Linux, /home и Shared
   --repair-boot          Восстановление/переустановка загрузчика Dual-Boot GRUB в EFI
   (без аргументов)       Запуск интерактивного меню с подсказками
+
+ПОТОК УСТАНОВКИ WINDOWS (вариант A — через autounattend.xml и Ventoy):
+  1) sudo bash deploy.sh --prep-disk
+     → диск размечен и отформатирован, рядом с Windows ISO создан autounattend.xml
+  2) Загрузите Windows ISO с Ventoy — установщик применит autounattend.xml
+     и поставит Windows на раздел C: без запросов
+  3) sudo bash deploy.sh --reinstall-ubuntu
+     → Ubuntu ставится последней, GRUB с os-prober увидит Windows
 
 ОПЦИИ:
   --dry-run              Режим симуляции (команды выводятся, но не исполняются)
@@ -138,9 +152,10 @@ EOF
 # Разбор аргументов командной строки
 while (( $# )); do
     case "$1" in
-        --full|-f)             MODE="FULL" ;;
+        --prep-disk)           MODE="PREP_DISK" ;;
+        --full|-f)             MODE="PREP_DISK" ;;
         --reinstall-ubuntu)    MODE="REINSTALL_UBUNTU" ;;
-        --reinstall-windows)   MODE="REINSTALL_WINDOWS" ;;
+        --reinstall-windows)   die "Режим --reinstall-windows удалён: Windows ставится загрузкой ISO с Ventoy (autounattend.xml), затем --reinstall-ubuntu (см. --help)." ;;
         --repair-boot)         MODE="REPAIR_BOOT" ;;
         --dry-run)             DRY=1 ;;
         --yes|-y)              YES=1 ;;
@@ -204,23 +219,26 @@ show_menu() {
     echo -e "${C_CYAN}    🚀 УНИВЕРСАЛЬНЫЙ ДИСПЕТЧЕР РАЗВЕРТЫВАНИЯ DUAL-BOOT (PROVISIONING) ${C_RESET}"
     echo -e "${C_BOLD}======================================================================${C_RESET}"
     echo -e "Целевой накопитель : ${C_GREEN}${TARGET_DISK}${C_RESET} (${disk_model}, ${disk_size})"
-    echo -e "Образ Windows 11   : ${WIN_ISO:-${C_YELLOW}Не найден (установка Windows будет пропущена)${C_RESET}}"
-    echo -e "Образ Ubuntu       : ${UBUNTU_ISO:-${C_YELLOW}Не найден (будет использован сетевой debootstrap)${C_RESET}}"
+    echo -e "Образ Windows 11   : ${WIN_ISO:-${C_YELLOW}Не найден (Windows ставится загрузкой ISO с Ventoy)${C_RESET}}"
+    echo -e "Образ Ubuntu       : ${UBUNTU_ISO:-${C_YELLOW}Не найден (требуется ISO Ubuntu 24.04)${C_RESET}}"
     echo -e "Среда исполнения   : ${C_GREEN}RAM (/tmp)${C_RESET} (полная защита от блокировок Live-USB)"
     echo -e "----------------------------------------------------------------------"
-    echo -e "Выберите режим работы:"
-    echo -e "  ${C_BOLD}[1]${C_RESET} 💥 ${C_RED}ПОЛНОЕ развертывание с нуля${C_RESET} (разметка GPT + Windows + Ubuntu + Shared + /home)"
-    echo -e "  ${C_BOLD}[2]${C_RESET} 🔄 ${C_GREEN}Переустановить ТОЛЬКО Ubuntu${C_RESET} (корень /), сохранив /home, Windows и Shared"
-    echo -e "  ${C_BOLD}[3]${C_RESET} 🪟 ${C_BLUE}Переустановить ТОЛЬКО Windows${C_RESET} (диск C:), сохранив Linux, /home и Shared"
+    echo -e "ПОТОК УСТАНОВКИ (этапы):"
+    echo -e "  ${C_BOLD}[1]${C_RESET} 💥 ${C_RED}Разметить и подготовить диск${C_RESET} (GPT + autounattend.xml для Windows)"
+    echo -e "  ${C_BOLD}[2]${C_RESET} 🪟 ${C_BLUE}Загрузить Windows ISO с Ventoy${C_RESET} (установит Windows на C: по autounattend.xml)"
+    echo -e "  ${C_BOLD}[3]${C_RESET} 🔄 ${C_GREEN}Установить ТОЛЬКО Ubuntu${C_RESET} (корень /), сохранив /home, Windows и Shared"
     echo -e "  ${C_BOLD}[4]${C_RESET} 🔧 ${C_YELLOW}Восстановить загрузчик Dual-Boot GRUB в EFI${C_RESET}"
     echo -e "  ${C_BOLD}[0]${C_RESET} ❌ Выход"
     echo -e "----------------------------------------------------------------------"
     read -rp "Введите номер действия [0-4]: " choice
 
     case "$choice" in
-        1) MODE="FULL" ;;
-        2) MODE="REINSTALL_UBUNTU" ;;
-        3) MODE="REINSTALL_WINDOWS" ;;
+        1) MODE="PREP_DISK" ;;
+        2) info "Этап 2 — ВРУЧНУЮ: перезагрузите компьютер и выберите Windows ISO в меню Ventoy."
+           info "Установщик сам применит autounattend.xml и поставит Windows на раздел C:."
+           info "Затем снова загрузите Live-среду и выполните: sudo bash $0 --reinstall-ubuntu"
+           exit 0 ;;
+        3) MODE="REINSTALL_UBUNTU" ;;
         4) MODE="REPAIR_BOOT" ;;
         0) exit 0 ;;
         *) die "Неверный выбор" ;;
@@ -312,64 +330,72 @@ do_format_partitions() {
     success "Все файловые системы отформатированы!"
 }
 
-# 3. Развертывание Windows
-do_deploy_windows() {
-    if [[ -z "$WIN_ISO" || ! -f "$WIN_ISO" ]]; then
-        warn "Образ Windows не найден, пропуск установки Windows."
+# 3. Подготовка диска под Dual-Boot (Windows ставится загрузкой ISO с Ventoy)
+# ------------------------------------------------------------------------------
+# Генерация полного autounattend.xml из templates/unattend.xml.template:
+# DiskConfiguration (WillWipeDisk=false, ModifyPartition по размерам нашей
+# разметки) + все компоненты (локали, OOBE, UTC, Fast Startup, BitLocker).
+# Файл кладётся рядом с Windows ISO на флешке, чтобы Ventoy передал его
+# установщику при загрузке ISO.
+generate_autounattend() {
+    local template="${SCRIPT_DIR}/templates/unattend.xml.template"
+    if [[ ! -f "$template" ]]; then
+        # RAM-копия могла не забрать шаблон — берём из оригинального каталога
+        template="${ORIG_SCRIPT_DIR}/templates/unattend.xml.template"
+    fi
+    [[ -f "$template" ]] || die "Шаблон autounattend.xml не найден: $template"
+
+    # Наша GPT-разметка: 1=EFI, 2=MSR, 3=Windows(C:), 4=Recovery, 5=Shared,
+    # 6=UbuntuRoot, 7=UbuntuHome. Windows Setup нумерует разделы так же.
+    local win_part_id=3
+    local img_index="${WIN_IMAGE_INDEX:-1}"
+
+    # Определяем каталог Windows ISO (обычно это флешка Ventoy)
+    local out_dir=""
+    if [[ -n "$WIN_ISO" && -f "$WIN_ISO" ]]; then
+        out_dir="$(dirname "$WIN_ISO")"
+        [[ -w "$out_dir" ]] || out_dir=""
+    fi
+    if [[ -z "$out_dir" ]]; then
+        warn "Windows ISO не найден или каталог не доступен на запись — autounattend.xml будет создан в $ORIG_SCRIPT_DIR (скопируйте его рядом с Windows ISO)."
+        out_dir="$ORIG_SCRIPT_DIR"
+    fi
+    local out_file="${out_dir}/autounattend.xml"
+
+    if (( DRY )); then
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} sed-подстановка $template → $out_file"
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} (USERNAME=$USERNAME, HOSTNAME=$HOSTNAME, Windows-раздел=$win_part_id, index образа=$img_index)"
         return 0
     fi
 
-    info "Развертывание Windows из $WIN_ISO..."
-    if ! (( DRY )); then
-        command -v wimlib-imagex >/dev/null || {
-            info "Установка wimtools..."
-            apt update -qq && apt install -y -qq wimtools
-        }
+    info "Генерация autounattend.xml (DiskConfiguration под нашу разметку, WillWipeDisk=false)..."
+    if ! sed -e "s/__USERNAME__/${USERNAME}/g" \
+             -e "s/__HOSTNAME__/${HOSTNAME}/g" \
+             -e "s/__WIN_PARTITION_ID__/${win_part_id}/g" \
+             -e "s/__WIN_IMAGE_INDEX__/${img_index}/g" \
+             "$template" > "$out_file"; then
+        die "Не удалось сгенерировать autounattend.xml: $out_file"
     fi
-
-    local sep=""
-    [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
-    local p_win="${TARGET_DISK}${sep}3"
-
-    local iso_mnt="/tmp/win_iso_mnt"
-    run mkdir -p "$iso_mnt"
-    run mount -o loop,ro "$WIN_ISO" "$iso_mnt"
-
-    if ! (( DRY )); then
-        local wim_file=""
-        if [[ -f "$iso_mnt/sources/install.wim" ]]; then
-            wim_file="$iso_mnt/sources/install.wim"
-        elif [[ -f "$iso_mnt/sources/install.esd" ]]; then
-            wim_file="$iso_mnt/sources/install.esd"
-        fi
-
-        [[ -n "$wim_file" ]] || die "Не найден install.wim/install.esd в $WIN_ISO"
-
-        info "Распаковка образа Windows на $p_win (через wimlib-imagex)..."
-        wimlib-imagex apply "$wim_file" 1 "$p_win"
-
-        local win_mnt="/tmp/win_sys_mnt"
-        mkdir -p "$win_mnt"
-        mount "$p_win" "$win_mnt"
-        mkdir -p "$win_mnt/Windows/Panther"
-
-        local template="${SCRIPT_DIR}/templates/unattend.xml.template"
-        if [[ -f "$template" ]]; then
-            sed -e "s/__USERNAME__/$USERNAME/g" \
-                -e "s/__HOSTNAME__/$HOSTNAME/g" \
-                "$template" > "$win_mnt/Windows/Panther/unattend.xml"
-            success "Файл автоответов unattend.xml успешно внедрен!"
-        fi
-
-        umount "$win_mnt"
-        umount "$iso_mnt"
-    else
-        echo -e "  ${C_CYAN}[dry-run]${C_RESET} wimlib-imagex apply /sources/install.wim 1 $p_win"
-        echo -e "  ${C_CYAN}[dry-run]${C_RESET} Внедрение unattend.xml (UTC, No FastBoot, No BitLocker)"
-    fi
-    success "Windows успешно развернута!"
+    success "autounattend.xml создан: $out_file"
+    info "Загрузите Windows ISO с Ventoy — установщик применит этот файл автоматически."
 }
 
+# 3a. Разметка + форматирование БЕЗ установки ОС (этап подготовки к Windows)
+do_prep_disk() {
+    do_partition_disk
+    do_format_partitions
+    generate_autounattend
+    echo
+    info "Диск подготовлен. Дальнейший поток установки:"
+    info "  1) Перезагрузитесь и загрузите Windows ISO с Ventoy — autounattend.xml"
+    info "     поставит Windows на раздел C: (раздел 3) без запросов."
+    info "  2) После установки Windows снова загрузите Live-среду и выполните:"
+    info "     sudo bash $0 --reinstall-ubuntu   # Ubuntu + GRUB с os-prober последним"
+}
+
+# 3b. Установка Windows загрузкой ISO с Ventoy (autounattend). Этот этап
+# выполняется ВРУЧНУЮ пользователем (перезагрузка + выбор ISO в меню Ventoy),
+# поэтому в CLI отдельного режима не имеет: см. do_prep_disk.
 # 4. Развертывание Ubuntu и настройка /swapfile + 7 правил
 do_deploy_ubuntu() {
     info "Развертывание Ubuntu..."
@@ -484,11 +510,11 @@ main() {
     fi
 
     case "$MODE" in
-        FULL)
-            do_partition_disk
-            do_format_partitions
-            do_deploy_windows
-            do_deploy_ubuntu
+        PREP_DISK)
+            # Полный поток, этап 1: разметка+формат+autounattend. Windows
+            # ставится загрузкой ISO с Ventoy, Ubuntu — позже (--reinstall-ubuntu),
+            # чтобы GRUB с os-prober увидел Windows последним (см. usage/README).
+            do_prep_disk
             ;;
         REINSTALL_UBUNTU)
             info "Точечная переустановка Ubuntu (корень /)..."
@@ -496,13 +522,6 @@ main() {
             [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
             run mkfs.ext4 -F -L "UbuntuRoot" "${TARGET_DISK}${sep}6"
             do_deploy_ubuntu
-            ;;
-        REINSTALL_WINDOWS)
-            info "Точечная переустановка Windows..."
-            local sep=""
-            [[ "$TARGET_DISK" =~ [0-9]$ ]] && sep="p"
-            run mkfs.ntfs -f -L "Windows" "${TARGET_DISK}${sep}3"
-            do_deploy_windows
             ;;
         REPAIR_BOOT)
             info "Восстановление загрузчика GRUB..."

@@ -1,5 +1,61 @@
 <?xml version="1.0" encoding="utf-8"?>
-<unattend xmlns="urn:schemas-microsoft-com:unattend">
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+    <settings pass="windowsPE">
+        <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <SetupUILanguage>
+                <UILanguage>ru-RU</UILanguage>
+            </SetupUILanguage>
+            <InputLocale>0419:00000419;0409:00000409</InputLocale>
+            <SystemLocale>ru-RU</SystemLocale>
+            <UILanguage>ru-RU</UILanguage>
+            <UserLocale>ru-RU</UserLocale>
+        </component>
+        <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+            <DiskConfiguration>
+                <WillWipeDisk>false</WillWipeDisk>
+                <Disk wcm:action="add">
+                    <DiskID>0</DiskID>
+                    <WillWipeDisk>false</WillWipeDisk>
+                    <!--
+                        Диск уже размечен скриптом deploy.sh в режиме prep-disk:
+                        p1=EFI, p2=MSR, p3=Windows, p4=Recovery, p5=Shared,
+                        p6=UbuntuRoot, p7=UbuntuHome. Разделы Windows (p3)
+                        переформатируются в NTFS, остальные не трогаем.
+                    -->
+                    <ModifyPartitions>
+                        <ModifyPartition wcm:action="add">
+                            <Order>1</Order>
+                            <PartitionID>__WIN_PARTITION_ID__</PartitionID>
+                            <Format>NTFS</Format>
+                            <Label>Windows</Label>
+                            <Letter>C</Letter>
+                            <Extend>false</Extend>
+                        </ModifyPartition>
+                    </ModifyPartitions>
+                </Disk>
+            </DiskConfiguration>
+            <ImageInstall>
+                <OSImage>
+                    <InstallFrom>
+                        <MetaData wcm:action="add">
+                            <Key>/IMAGE/INDEX</Key>
+                            <Value>__WIN_IMAGE_INDEX__</Value>
+                        </MetaData>
+                    </InstallFrom>
+                    <InstallTo>
+                        <DiskID>0</DiskID>
+                        <PartitionID>__WIN_PARTITION_ID__</PartitionID>
+                    </InstallTo>
+                    <WillShowUI>OnError</WillShowUI>
+                </OSImage>
+            </ImageInstall>
+            <UserData>
+                <AcceptEula>true</AcceptEula>
+                <FullName>__USERNAME__</FullName>
+                <Organization>__HOSTNAME__</Organization>
+            </UserData>
+        </component>
+    </settings>
     <settings pass="specialize">
         <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <ComputerName>__HOSTNAME__</ComputerName>
