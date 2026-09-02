@@ -253,18 +253,21 @@ if ! (( DRY )); then
     rsync -aHAX --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
     success "Данные успешно скопированы на раздел p8!"
 
-    info "Очистка старой папки /home на системном разделе p7 (освобождение места)..."
-    find "$MNT_ROOT/home" -mindepth 1 -delete
-
+    # fstab обновляется ДО удаления старого /home: прерывание между шагами
+    # оставляет максимум "незачищенные старые копии" на p7, а не пустой /home.
     NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
     info "Обновление /etc/fstab установленной системы (UUID: $NEW_HOME_UUID)..."
     cp -a "$MNT_ROOT/etc/fstab" "$MNT_ROOT/etc/fstab.bak-$TS"
     echo "UUID=${NEW_HOME_UUID}   /home           ext4    defaults          0       2" >> "$MNT_ROOT/etc/fstab"
     cp "/tmp/parttable-before-split-$TS.bak" "$MNT_ROOT/root/parttable-before-split-$TS.bak"
     success "Конфигурация fstab обновлена!"
+
+    info "Очистка старой папки /home на системном разделе p7 (освобождение места)..."
+    find "$MNT_ROOT/home" -mindepth 1 -delete
 else
     echo -e "  ${C_CYAN}[dry-run]${C_RESET} rsync -aHAX /tmp/split_root_mnt/home/ /tmp/split_home_mnt/"
     echo -e "  ${C_CYAN}[dry-run]${C_RESET} Добавление UUID p8 в /etc/fstab как /home"
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Очистка старой папки /home на p7 (только ПОСЛЕ обновления fstab)"
 fi
 
 run sync
@@ -281,6 +284,9 @@ echo -e "${C_GREEN}${C_BOLD}====================================================
 echo -e "Итог:"
 echo -e " • Системный корень (p7): ${C_GREEN}200 ГБ${C_RESET} (занято ~47 ГБ, свободно 153 ГБ)"
 echo -e " • Раздел данных /home (p8): ${C_GREEN}~427 ГБ${C_RESET} (занято ~66 ГБ, свободно 361 ГБ)"
+echo -e " • Если операцию прервали между обновлением fstab и очисткой, на p7 остались"
+echo -e "   старые копии /home. Чистка (безопасно, p8 уже смонтирован как /home):"
+echo -e "   Live -> mount /dev/nvme0n1p7 /mnt/p7 && rm -rf /mnt/p7/home/*"
 echo -e "Компьютер готов к перезагрузке в обычную систему."
 }
 

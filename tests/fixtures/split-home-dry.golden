@@ -43,6 +43,7 @@
   [1;36m[dry-run][0m mount /dev/nvme0n1p8 /tmp/split_home_mnt
   [1;36m[dry-run][0m rsync -aHAX /tmp/split_root_mnt/home/ /tmp/split_home_mnt/
   [1;36m[dry-run][0m Добавление UUID p8 в /etc/fstab как /home
+  [1;36m[dry-run][0m Очистка старой папки /home на p7 (только ПОСЛЕ обновления fstab)
   [1;36m[dry-run][0m sync
   [1;36m[dry-run][0m umount /tmp/split_home_mnt
   [1;36m[dry-run][0m umount /tmp/split_root_mnt
@@ -53,4 +54,7 @@
 Итог:
  • Системный корень (p7): [1;32m200 ГБ[0m (занято ~47 ГБ, свободно 153 ГБ)
  • Раздел данных /home (p8): [1;32m~427 ГБ[0m (занято ~66 ГБ, свободно 361 ГБ)
+ • Если операцию прервали между обновлением fstab и очисткой, на p7 остались
+   старые копии /home. Чистка (безопасно, p8 уже смонтирован как /home):
+   Live -> mount /dev/nvme0n1p7 /mnt/p7 && rm -rf /mnt/p7/home/*
 Компьютер готов к перезагрузке в обычную систему.
