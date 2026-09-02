@@ -40,7 +40,7 @@ check() { # $1 ожидаемый фрагмент
 }
 check "mklabel gpt"
 check "mkpart EFI fat32 ${a}MiB ${b}MiB"
-check "mkpart Microsoft reserved partition ${b}MiB ${c}MiB"
+check "mkpart MicrosoftReserved ${b}MiB ${c}MiB"
 check "mkpart Windows ntfs ${c}MiB ${d}MiB"
 check "mkpart Recovery ntfs ${d}MiB ${e}MiB"
 check "mkpart SHARED ${e}MiB ${f}MiB"

@@ -12,7 +12,7 @@
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart EFI fat32 1MiB 501MiB
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 1 boot on
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 1 esp on
-  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart Microsoft reserved partition 501MiB 517MiB
+  [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart MicrosoftReserved 501MiB 517MiB
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 2 msftres on
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart Windows ntfs 517MiB 256517MiB
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 3 msftdata on

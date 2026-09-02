@@ -312,7 +312,7 @@ do_partition_disk() {
 
     # p2: Microsoft Reserved Partition (16 MB)
     local msr_end=$((cur_mb + MSR_SIZE_MB))
-    run parted -s "$TARGET_DISK" mkpart "Microsoft reserved partition" "${cur_mb}MiB" "${msr_end}MiB"
+    run parted -s "$TARGET_DISK" mkpart MicrosoftReserved "${cur_mb}MiB" "${msr_end}MiB"
     run parted -s "$TARGET_DISK" set 2 msftres on
     cur_mb=$msr_end
 
