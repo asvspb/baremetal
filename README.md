@@ -101,7 +101,7 @@ sudo -n make test-loop  # L4: реальные parted/mkfs на loop-устро�
 Windows больше **не** распаковывается из ISO через `wimlib-imagex` (такой способ не создавал загрузчик Windows, и система не стартовала). Вместо этого используется штатный установщик Windows, запущенный загрузкой ISO с флешки Ventoy:
 
 1. **`sudo bash deploy.sh --prep-disk`** — разметка GPT + форматирование всех разделов **без установки ОС**. Скрипт дополнительно генерирует полный `autounattend.xml` (файл кладётся рядом с Windows ISO на флешке): в нём `<DiskConfiguration>` под нашу разметку (`WillWipeDisk=false`, переформатируется только раздел Windows C:), настройки UTC / Fast Startup / BitLocker, локали и OOBE.
-2. **Перезагрузка** → в меню Ventoy выбираем Windows ISO. Установщик автоматически применяет `autounattend.xml`, ставит Windows на раздел C: и сам создаёт загрузчик.
+2. **Перезагрузка** → в меню Ventoy выбираем Windows ISO. Установщик автоматически применяет `autounattend.xml`, ставит Windows на раздел C: и сам создаёт загрузчик. Примечание: `autounattend.xml` содержит пароль в открытом виде — после установки Windows удалите его с флешки (копия в `C:\Windows\Panther` стирается автоматически при первом входе).
 3. **`sudo bash deploy.sh --reinstall-ubuntu`** — Ubuntu ставится **последней**; GRUB с `os-prober` обнаруживает установленную Windows и создаёт полноценное меню Dual-Boot.
 
 > Старые режимы `--full` (автоматическая распаковка Windows) и `--reinstall-windows` удалены — они заменены этим документированным потоком. `--full` / `-f` оставлен как синоним этапа `--prep-disk`.

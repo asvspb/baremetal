@@ -154,6 +154,12 @@
                     <CommandLine>powershell -NoProfile -ExecutionPolicy Bypass -Command "$log='C:\Windows\Temp\deploy-debloat.log'; $pat='^(Microsoft.BingNews|Microsoft.BingWeather|Microsoft.MicrosoftSolitaireCollection|Microsoft.WindowsFeedbackHub|Microsoft.Getstarted|Microsoft.GetHelp|Microsoft.MicrosoftOfficeHub|Microsoft.549981C3F5F10)$'; Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -match $pat } | ForEach-Object { $_.DisplayName | Out-File $log -Append; Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }; Get-AppxPackage -AllUsers | Where-Object { $_.Name -match $pat } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue"</CommandLine>
                     <Description>Remove Bloatware (provisioned + all users)</Description>
                 </AsynchronousCommand>
+                <!-- Удаляем копию autounattend из Panther: в ней пароль в открытом виде -->
+                <SynchronousCommand wcm:action="add">
+                    <Order>7</Order>
+                    <CommandLine>cmd /c del /f /q "%WINDIR%\Panther\unattend.xml"</CommandLine>
+                    <Description>Remove answer file with plaintext password</Description>
+                </SynchronousCommand>
             </FirstLogonCommands>
         </component>
         <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">

@@ -220,6 +220,11 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 
 1. Windows-машина: запуск make-boot-usb.ps1 на некритимой флешке (полный цикл с бэкапом).
 2. Реальная установка Windows по autounattend с Ventoy (§ потока в README).
+   После первого входа дополнительно проверить: reg-политики телеметрии
+   (`AllowTelemetry`, `DoNotShowFeedbackNotifications`), чистый Пуск без
+   «рекомендаций», лог `C:\Windows\Temp\deploy-debloat.log` и отсутствие
+   приложений из списка debloat у нового пользователя, отсутствие
+   `C:\Windows\Panther\unattend.xml`.
 3. split-home.sh --dry-run → реальный запуск на целевом NVMe.
 4. Контрольный замер скорости и восстановление данных на реальной флешке.
 

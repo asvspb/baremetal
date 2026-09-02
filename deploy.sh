@@ -428,6 +428,7 @@ generate_autounattend() {
         die "Не удалось сгенерировать autounattend.xml: $out_file"
     fi
     success "autounattend.xml создан: $out_file"
+    [[ -n "$WIN_PASSWORD" ]] && warn "autounattend.xml содержит пароль в открытом виде — удалите файл с флешки после установки Windows."
     info "Загрузите Windows ISO с Ventoy — установщик применит этот файл автоматически."
 }
 
@@ -442,6 +443,8 @@ do_prep_disk() {
     info "     поставит Windows на раздел C: (раздел 3) без запросов."
     info "  2) После установки Windows снова загрузите Live-среду и выполните:"
     info "     sudo bash $0 --reinstall-ubuntu   # Ubuntu + GRUB с os-prober последним"
+    info "  3) После установки Windows удалите autounattend.xml с флешки"
+    info "     (в нём пароль в открытом виде; копия в C:\Windows\Panther удаляется автоматически)."
 }
 
 # 3b. Установка Windows загрузкой ISO с Ventoy (autounattend). Этот этап
