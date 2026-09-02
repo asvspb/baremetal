@@ -17,9 +17,9 @@ sudo bash ~/Dev/deploy-baremetal/make-boot-usb.sh
   * Размечает в GPT с поддержкой UEFI Secure Boot.
   * Создает раздел **Ventoy (exFAT)** с меткой (`FD-0`, `FD-1`, `FD-2` и т.д.) нужного размера (8 ГБ / 16 ГБ / кастомный).
   * Устанавливает темную тему **Xenlism-Ubuntu (1080p)** и `ventoy.json`.
-  * Создает раздел данных (**F2FS со сжатием** или **exFAT** для совместимости с Android/Windows).
+  * Создает раздел данных (по выбору: **F2FS со сжатием**, **exFAT** для совместимости с Android/Windows или **NTFS**).
   * Скрывает служебный EFI раздел `VTOYEFI`.
-  * Автоматически копирует скрипты `split-home.sh`, `deploy-baremetal` и `ubuntuInstaller` на раздел данных.
+  * Автоматически копирует пакет развертывания `deploy-baremetal/` (`deploy.sh`, `deploy.conf`, `split-home.sh`, `templates/`) на раздел данных.
 
 ### 🪟 Для Windows (PowerShell):
 Самый простой способ — двойной клик по **`make-boot-usb.bat`**: он сам запросит права Администратора через UAC и запустит мастер.
@@ -49,9 +49,11 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 ├── Раздел 2 (FAT16, 32 МБ) — «VTOYEFI» (Скрытый системный загрузчик)
 │
 └── Раздел 3 (F2FS / exFAT, остаток диска) — Метка «F2FS / DATA»
-    ├── split-home.sh (Разделение существующей системы)
-    ├── deploy-baremetal/ (Автономный установщик OS)
-    └── ubuntuInstaller/ (Пакет пост-установки и dotfiles)
+    └── deploy-baremetal/ (Автономный пакет развертывания OS)
+        ├── deploy.sh      (Установщик Dual-Boot: разметка, autounattend, Ubuntu + GRUB)
+        ├── deploy.conf    (Конфигурация размеров разделов и параметров)
+        ├── split-home.sh  (Разделение существующей системы на / и /home)
+        └── templates/     (unattend.xml.template для Windows Setup)
 ```
 
 ---
