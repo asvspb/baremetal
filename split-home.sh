@@ -85,6 +85,8 @@ P7_START_SECTOR=638709760
 P7_SIZE_SECTORS=419430400     # 200 GiB (200 * 1024 * 1024 * 2)
 P7_END_SECTOR=$((P7_START_SECTOR + P7_SIZE_SECTORS - 1)) # 1058140159
 P8_START_SECTOR=$((P7_END_SECTOR + 1))                   # 1058140160
+TARGET_SHRINK_GB=195          # до какого размера сжимаем ФС p7 (запас до границы 200 ГБ)
+USED_LIMIT_GB=190             # отказ, если занято в /home >= этого (ГБ): не влезет после сжатия
 
 DRY=0
 YES=0
@@ -152,10 +154,33 @@ info "Целевой размер p7: 200 ГБ (корень /)"
 info "Целевой размер p8: ~$(( (Z7 - P7_SIZE_SECTORS) * 512 / 1024 / 1024 / 1024 )) ГБ (данные /home)"
 }
 
+# ------------------------------------------------------------------------------
+# 1a. Ранняя проверка занятого места в /home: до долгого e2fsck/resize2fs.
+#     Если занято >= USED_LIMIT_GB, сжатие до TARGET_SHRINK_GB невозможно.
+# ------------------------------------------------------------------------------
+check_home_usage() {
+    local used preflight_mnt
+    if (( DRY )); then
+        used=$(df -B1G --output=used /home 2>/dev/null | tail -n 1 | tr -dc '0-9')
+        info "Предварительно занято в /home: ~${used:-?} ГБ (лимит отказа: ${USED_LIMIT_GB} ГБ)"
+        return 0
+    fi
+    preflight_mnt="/tmp/split_preflight"
+    run mkdir -p "$preflight_mnt"
+    run mount -o ro "$P7" "$preflight_mnt"
+    used=$(df -B1G --output=used "$preflight_mnt" | tail -n 1 | tr -dc '0-9')
+    run umount "$preflight_mnt"
+    info "Занято в /home: ${used} ГБ (лимит отказа: ${USED_LIMIT_GB} ГБ, сжатие до ${TARGET_SHRINK_GB} ГБ)"
+    if [[ -n "$used" && "$used" -ge "$USED_LIMIT_GB" ]]; then
+        die "В /home занято ${used} ГБ (>= ${USED_LIMIT_GB} ГБ): после сжатия p7 до ${TARGET_SHRINK_GB} ГБ данные не поместятся. Освободите /home (кэши, старые загрузки, контейнеры) и повторите."
+    fi
+}
+
 # Основной поток (только при прямом запуске; source в тестах — только определения)
 main() {
     parse_args "$@"
     check_environment
+    check_home_usage
 
 # ------------------------------------------------------------------------------
 # 2. Проверка смонтированных разделов
