@@ -29,7 +29,7 @@
       `-ErrorAction SilentlyContinue` (try/catch + завершение), проверка свободного
       места на диске `%TEMP%` (`Get-PSDrive`), сверка после восстановления,
       `Remove-Item $backupDir` только после успеха.
-- [ ] **T1.4 (S)** `deploy.sh`: cleanup-ловушка `trap ... EXIT` с отмонтированием
+- [x] **T1.4 (S)** `deploy.sh`: cleanup-ловушка `trap ... EXIT` с отмонтированием
       `/tmp/win_iso_mnt`, `/tmp/win_sys_mnt`, `/tmp/ubu_iso_mnt`, `/tmp/ubuntu_root_mnt`,
       `/tmp/boot_repair_root` (+ бинды chroot) — чтобы сбой не оставлял монтирования.
 

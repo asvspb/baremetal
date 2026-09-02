@@ -25,6 +25,45 @@ REAL_SOURCE="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
 
 # ==============================================================================
+# 🧹 Cleanup-ловушка: при любом завершении скрипта (успех или сбой) отмонтируем
+# ISO-образы, точки монтирования Ubuntu и бинды chroot, чтобы сбой не оставлял
+# «висящих» монтирований в /proc/mounts.
+# ==============================================================================
+cleanup_mounts() {
+    local root mp
+
+    # 1. Всё, что смонтировано ВНУТРИ корней chroot (разделы + бинды /dev, /proc,
+    #    /sys, /run), размонтируем от самых вложенных путей к корню.
+    for root in /tmp/ubuntu_root_mnt /tmp/boot_repair_root; do
+        [[ -d "$root" ]] || continue
+        local targets=()
+        while IFS= read -r mp; do
+            [[ -n "$mp" ]] && targets+=("$mp")
+        done < <(awk -v r="$root/" '$2 ~ "^" r {print $2}' /proc/self/mounts 2>/dev/null | sort -r || true)
+
+        for mp in "${targets[@]}"; do
+            umount "$mp" 2>/dev/null || true
+        done
+    done
+
+    # 2. Сами точки монтирования (если ещё смонтированы)
+    for mp in /tmp/ubuntu_root_mnt /tmp/boot_repair_root /tmp/win_iso_mnt /tmp/win_sys_mnt /tmp/ubu_iso_mnt; do
+        if grep -qE "^[^ ]+ $mp " /proc/self/mounts 2>/dev/null; then
+            umount "$mp" 2>/dev/null || true
+        fi
+    done
+
+    # 3. Диагностика: что-то осталось смонтированным — предупредим пользователя
+    for mp in /tmp/ubuntu_root_mnt /tmp/boot_repair_root /tmp/win_iso_mnt /tmp/win_sys_mnt /tmp/ubu_iso_mnt; do
+        if grep -qE "^[^ ]+ $mp( |/)" /proc/self/mounts 2>/dev/null; then
+            warn "Не удалось автоматически отмонтировать $mp — проверьте вручную."
+        fi
+    done
+    return 0
+}
+trap cleanup_mounts EXIT
+
+# ==============================================================================
 # 🛡️ ЗАЩИТА ОТ БЛОКИРОВКИ LIVE-USB:
 # Автоматический перенос скрипта в оперативную память (RAM /tmp).
 # Если Live-образ заблокировал раздел флешки (loop/casper/ro), скрипт
