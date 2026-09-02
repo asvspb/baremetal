@@ -52,7 +52,7 @@
       не ищет Windows).
 - [x] **T2.3 (S)** `deploy.sh`: путь debootstrap без ядра не загружается —
       заменить на `die "Требуется ISO Ubuntu (debootstrap не поддерживается)"`.
-- [ ] **T2.4 (M)** Мёртвые опции `deploy.conf` — реализовать или убрать:
+- [x] **T2.4 (M)** Мёртвые опции `deploy.conf` — реализовать или убрать:
       - `TIMEZONE` → `ln -sf /usr/share/zoneinfo/$TIMEZONE` в chroot (+ в unattend);
       - `DEFAULT_LOCALE` → `locale-gen` + `update-locale` в chroot;
       - `INSTALL_RESTRICTED_DRIVERS` → `ubuntu-drivers autoinstall` в chroot (warn при сбое);

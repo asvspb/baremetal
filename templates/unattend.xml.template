@@ -59,7 +59,7 @@
     <settings pass="specialize">
         <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <ComputerName>__HOSTNAME__</ComputerName>
-            <TimeZone>Russian Standard Time</TimeZone>
+            <TimeZone>__WIN_TIMEZONE__</TimeZone>
         </component>
         <component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <SkipAutoActivation>true</SkipAutoActivation>

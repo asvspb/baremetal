@@ -31,6 +31,27 @@ enable_os_prober() {
     fi
 }
 
+# Перевод IANA-часового пояса (deploy.conf TIMEZONE) в имя Windows для
+# autounattend.xml. Для неизвестных зон оставляем значение по умолчанию.
+iana_to_windows_tz() {
+    case "$1" in
+        Europe/Kaliningrad)                     echo "Kaliningrad Standard Time" ;;
+        Europe/Moscow|Europe/Kirov|Europe/Volgograd) echo "Russian Standard Time" ;;
+        Europe/Samara)                          echo "Russia Time Zone 3" ;;
+        Asia/Yekaterinburg)                     echo "Russia Time Zone 4" ;;
+        Asia/Omsk)                              echo "Omsk Standard Time" ;;
+        Asia/Novosibirsk)                       echo "N. Central Asia Standard Time" ;;
+        Asia/Krasnoyarsk)                       echo "North Asia Standard Time" ;;
+        Asia/Irkutsk)                           echo "North Asia East Standard Time" ;;
+        Asia/Chita)                             echo "Transbaikal Standard Time" ;;
+        Asia/Yakutsk)                           echo "Yakutsk Standard Time" ;;
+        Asia/Vladivostok|Asia/Sakhalin)         echo "Vladivostok Standard Time" ;;
+        Asia/Magadan)                           echo "Magadan Standard Time" ;;
+        Asia/Kamchatka)                         echo "Kamchatka Standard Time" ;;
+        *)                                      echo "Russian Standard Time" ;;
+    esac
+}
+
 REAL_SOURCE="$(realpath "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SOURCE")" && pwd)"
 # Каталог, из которого скрипт реально запущен (флешка). После переноса в RAM
@@ -108,8 +129,6 @@ else
     UBUNTU_ROOT_SIZE_GB=120
     SWAPFILE_SIZE_GB=4
     SHARED_FSTYPE="exfat"
-    ROOT_FSTYPE="ext4"
-    HOME_FSTYPE="ext4"
     USERNAME="asv-spb"
     HOSTNAME="workstation"
     TIMEZONE="Europe/Moscow"
@@ -374,7 +393,7 @@ generate_autounattend() {
 
     if (( DRY )); then
         echo -e "  ${C_CYAN}[dry-run]${C_RESET} sed-подстановка $template → $out_file"
-        echo -e "  ${C_CYAN}[dry-run]${C_RESET} (USERNAME=$USERNAME, HOSTNAME=$HOSTNAME, Windows-раздел=$win_part_id, index образа=$img_index)"
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} (USERNAME=$USERNAME, HOSTNAME=$HOSTNAME, Windows-раздел=$win_part_id, index образа=$img_index, TZ=$(iana_to_windows_tz "$TIMEZONE"))"
         return 0
     fi
 
@@ -383,6 +402,7 @@ generate_autounattend() {
              -e "s/__HOSTNAME__/${HOSTNAME}/g" \
              -e "s/__WIN_PARTITION_ID__/${win_part_id}/g" \
              -e "s/__WIN_IMAGE_INDEX__/${img_index}/g" \
+             -e "s/__WIN_TIMEZONE__/$(iana_to_windows_tz "$TIMEZONE")/g" \
              "$template" > "$out_file"; then
         die "Не удалось сгенерировать autounattend.xml: $out_file"
     fi
@@ -471,12 +491,33 @@ do_deploy_ubuntu() {
 UUID=${u_root}   /               ext4    errors=remount-ro 0       1
 UUID=${u_home}   /home           ext4    defaults          0       2
 UUID=${u_efi}    /boot/efi       vfat    umask=0077        0       1
-UUID=${u_shared} /mnt/Shared     exfat   defaults,uid=1000,gid=1000,nofail 0 0
 /swapfile        none            swap    sw                0       0
 EOF
+        if [[ $ENABLE_SHARED_AUTOMOUNT -eq 1 ]]; then
+            echo "UUID=${u_shared} /mnt/Shared     exfat   defaults,uid=1000,gid=1000,nofail 0 0" >> "$root_mnt/etc/fstab"
+        fi
 
         echo "$HOSTNAME" > "$root_mnt/etc/hostname"
         echo "127.0.0.1 localhost $HOSTNAME" > "$root_mnt/etc/hosts"
+
+        # Часовой пояс из deploy.conf: симлинк zoneinfo (в chroot timedatectl не работает)
+        if [[ -n "$TIMEZONE" && -e "/usr/share/zoneinfo/$TIMEZONE" ]]; then
+            ln -sf "/usr/share/zoneinfo/$TIMEZONE" "$root_mnt/etc/localtime"
+            echo "$TIMEZONE" > "$root_mnt/etc/timezone"
+            info "Установлен часовой пояс: $TIMEZONE"
+        else
+            warn "TIMEZONE=$TIMEZONE не найден в /usr/share/zoneinfo — часовой пояс оставлен по умолчанию."
+        fi
+
+        # Язык системы по умолчанию из deploy.conf
+        if [[ -n "$DEFAULT_LOCALE" ]]; then
+            if chroot "$root_mnt" locale-gen "$DEFAULT_LOCALE" 2>/dev/null; then
+                chroot "$root_mnt" update-locale "LANG=$DEFAULT_LOCALE" 2>/dev/null || \
+                    warn "update-locale не смог применить DEFAULT_LOCALE=$DEFAULT_LOCALE."
+            else
+                warn "locale-gen не смог сгенерировать DEFAULT_LOCALE=$DEFAULT_LOCALE."
+            fi
+        fi
 
         [[ $ENABLE_UTC_TIME -eq 1 ]] && chroot "$root_mnt" timedatectl set-local-rtc 0 2>/dev/null || true
         [[ $ENABLE_FSTRIM_TIMER -eq 1 ]] && chroot "$root_mnt" systemctl enable fstrim.timer 2>/dev/null || true
@@ -491,6 +532,15 @@ EOF
 
         chroot "$root_mnt" apt update -qq 2>/dev/null || true
         chroot "$root_mnt" apt install -y -qq grub-efi-amd64 grub-efi-amd64-signed os-prober 2>/dev/null || true
+
+        # Проприетарные драйверы (Nvidia/Wi-Fi) — не критично при сбое
+        if [[ $INSTALL_RESTRICTED_DRIVERS -eq 1 ]]; then
+            info "Установка проприетарных драйверов (ubuntu-drivers autoinstall)..."
+            if ! chroot "$root_mnt" ubuntu-drivers autoinstall 2>/dev/null; then
+                warn "ubuntu-drivers autoinstall завершился с ошибкой — драйверы можно доустановить позже."
+            fi
+        fi
+
         chroot "$root_mnt" grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --recheck
         
         if [[ $PROTECT_GRUB_REMOVABLE -eq 1 ]]; then
@@ -505,8 +555,9 @@ EOF
         done
         umount "$root_mnt/boot/efi" "$root_mnt/home" "$root_mnt"
     else
-        echo -e "  ${C_CYAN}[dry-run]${C_RESET} Генерация /etc/fstab (Root + Home + EFI + /mnt/Shared + /swapfile)"
-        echo -e "  ${C_CYAN}[dry-run]${C_RESET} Создание пользователя $USERNAME, fstrim.timer, RTC UTC"
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} Генерация /etc/fstab (Root + Home + EFI + /swapfile; /mnt/Shared — при ENABLE_SHARED_AUTOMOUNT=1)"
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} Создание пользователя $USERNAME, fstrim.timer, RTC UTC, TZ=$TIMEZONE, locale=$DEFAULT_LOCALE"
+        echo -e "  ${C_CYAN}[dry-run]${C_RESET} ubuntu-drivers autoinstall (при INSTALL_RESTRICTED_DRIVERS=1)"
         echo -e "  ${C_CYAN}[dry-run]${C_RESET} grub-install --target=x86_64-efi --removable + os-prober (Dual-Boot)"
     fi
     success "Ubuntu успешно установлена и настроена!"
