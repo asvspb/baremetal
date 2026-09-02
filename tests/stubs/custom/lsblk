@@ -18,7 +18,7 @@ case "$args" in
             printf '%s\n' "$STUB_LSBLK_PARTS"
         fi
         ;;
-    *-npo\ NAME*|*-rnpo\ NAME*|*-nplo\ NAME*)
+    *-npo\ NAME*|*-rnpo\ NAME*|*-nplo\ NAME*|*-nlpo\ NAME*)
         # полные пути разделов для бэкапа make-boot-usb.sh
         if [[ -n "${STUB_LSBLK_PARTS_FULL:-}" ]]; then
             printf '%s\n' "$STUB_LSBLK_PARTS_FULL"

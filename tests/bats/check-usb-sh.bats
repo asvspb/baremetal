@@ -160,3 +160,22 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
     assert_output --partial "GUARD-STATIC=PRESENT"
     assert_output --partial "NVME-NOT-OFFERED"
 }
+
+# ---------- Регрессия древесных префиксов lsblk (реальный запуск 2026-09-02) ----------
+
+@test "I-M9: перечисление разделов плоским списком (-l), без префиксов дерева" {
+    # Статика: обе точки перечисления используют -nlpo (не -npo без -l)
+    run grep -c 'lsblk -nlpo NAME' "${REPO_DIR}/make-boot-usb.sh"
+    assert_success
+    assert_output "2"
+    run bash -c "grep -E 'lsblk -npo NAME' '${REPO_DIR}/make-boot-usb.sh' | grep -v -- '-nlpo' && exit 1 || exit 0"
+    assert_success
+    # Функционально: реальный lsblk с -nlpo не отдаёт древесные префиксы
+    local disk
+    disk="$(lsblk -dpno NAME | head -n 1)"
+    if [[ -z "$disk" ]]; then skip "нет блочных устройств"; fi
+    run bash -c "lsblk -nlpo NAME \"$disk\""
+    assert_success
+    refute_output --partial $'\u251c\u2500'
+    refute_output --partial $'\u2514\u2500'
+}

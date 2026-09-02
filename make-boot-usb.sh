@@ -67,7 +67,7 @@ check_drive_integrity() {
     local parts=()
     while IFS= read -r p; do
         [[ -n "$p" ]] && parts+=("$p")
-    done < <(lsblk -npo NAME "$TARGET_DISK" | grep -v "^${TARGET_DISK}$" || true)
+    done < <(lsblk -nlpo NAME "$TARGET_DISK" | grep -v "^${TARGET_DISK}$" || true)
 
     if [[ ${#parts[@]} -eq 0 ]]; then
         info "На флешке нет разделов. Проверка прямого чтения первых 100 МБ блоков..."
@@ -84,8 +84,8 @@ check_drive_integrity() {
 
     for part in "${parts[@]}"; do
         local fstype label
-        fstype=$(lsblk -no FSTYPE "$part" || true)
-        label=$(lsblk -no LABEL "$part" || true)
+        fstype=$(lsblk -no FSTYPE "$part" 2>/dev/null || true)
+        label=$(lsblk -no LABEL "$part" 2>/dev/null || true)
         echo -e "\n• Сканирование раздела ${C_CYAN}${part}${C_RESET} [${fstype^^:-Неизвестно}, Метка: ${label:-Без метки}]..."
         
         umount "$part" 2>/dev/null || true
@@ -114,7 +114,8 @@ check_drive_integrity() {
                 ;;
             *)
                 check_out="Чтение блоков..."
-                dd if="$part" of=/dev/null bs=1M count=50 status=none 2>/dev/null || check_out="Ошибка чтения блоков"
+                # ERROR: — англ. маркер для grep-детектора ниже (сообщение локализовано)
+                dd if="$part" of=/dev/null bs=1M count=50 status=none 2>/dev/null || check_out="ERROR: ошибка чтения блоков $part"
                 ;;
         esac
 
@@ -171,7 +172,7 @@ backup_existing_files() {
     local parts=()
     while IFS= read -r p; do
         [[ -n "$p" ]] && parts+=("$p")
-    done < <(lsblk -npo NAME "$TARGET_DISK" | grep -v "^${TARGET_DISK}$" || true)
+    done < <(lsblk -nlpo NAME "$TARGET_DISK" | grep -v "^${TARGET_DISK}$" || true)
 
     [[ ${#parts[@]} -eq 0 ]] && return 0
 
