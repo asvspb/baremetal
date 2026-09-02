@@ -46,6 +46,14 @@ for ch in ('\u201c', '\u201d', '\u2018', '\u2019'):
     if ch in raw.decode('utf-8-sig'):
         err(f'найдена «умная» кавычка {ch!r}')
         sys.exit(1)
+# $var: внутри строк PowerShell трактует как drive-qualified ссылку ($env:PATH);
+# если после ':' нет имени — ошибка парсера PS 5.1/7. Исправление: ${var}:
+import re
+m = re.search(r'\$[A-Za-z]\w*:(?!\w)', raw.decode('utf-8-sig'))
+if m:
+    err(f'недопустимая ссылка {m.group(0)} — отделяй имя фигурными скобками: ${{...}}:')
+    sys.exit(1)
+
 # один SYNOPSIS и один param()
 text = raw.decode('utf-8-sig')
 if text.count('.SYNOPSIS') != 1:
