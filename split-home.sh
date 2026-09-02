@@ -253,6 +253,19 @@ if ! (( DRY )); then
     rsync -aHAX --info=progress2 "$MNT_ROOT/home/" "$MNT_HOME/"
     success "Данные успешно скопированы на раздел p8!"
 
+    # Сверка копии ДО уничтожения оригинала: второй проход rsync в dry-режиме
+    # с itemize. Пустой вывод = деревья идентичны (контент, права, xattr, ACL,
+    # hardlinks). Непустой = die: старый /home НЕ тронут, fstab НЕ изменён.
+    info "Сверка копии с оригиналом (rsync -n --itemize)..."
+    verify_out="$(rsync -aHAXSn --itemize --out-format='%i %n' \
+        "$MNT_ROOT/home/" "$MNT_HOME/" 2>&1 || true)"
+    if [[ -n "$verify_out" ]]; then
+        die "Сверка /home после копирования не сошлась (первые расхождения):
+$verify_out
+Старый /home НЕ удалён, fstab НЕ изменён. Разберитесь с расхождениями вручную."
+    fi
+    success "Сверка пройдена: копия идентична оригиналу."
+
     # fstab обновляется ДО удаления старого /home: прерывание между шагами
     # оставляет максимум "незачищенные старые копии" на p7, а не пустой /home.
     NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
@@ -266,6 +279,7 @@ if ! (( DRY )); then
     find "$MNT_ROOT/home" -mindepth 1 -delete
 else
     echo -e "  ${C_CYAN}[dry-run]${C_RESET} rsync -aHAX /tmp/split_root_mnt/home/ /tmp/split_home_mnt/"
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} Сверка копии (rsync -n --itemize) ДО изменения fstab и удаления старого /home"
     echo -e "  ${C_CYAN}[dry-run]${C_RESET} Добавление UUID p8 в /etc/fstab как /home"
     echo -e "  ${C_CYAN}[dry-run]${C_RESET} Очистка старой папки /home на p7 (только ПОСЛЕ обновления fstab)"
 fi
