@@ -530,7 +530,11 @@ EOF
             fi
         fi
 
-        [[ $ENABLE_UTC_TIME -eq 1 ]] && chroot "$root_mnt" timedatectl set-local-rtc 0 2>/dev/null || true
+        # RTC в UTC (часы не сбиваются с Windows): timedatectl в chroot не
+        # работает, поэтому пишем /etc/adjtime напрямую
+        if [[ $ENABLE_UTC_TIME -eq 1 ]]; then
+            printf '0.0 0 0\n0\nUTC\n' > "$root_mnt/etc/adjtime"
+        fi
         [[ $ENABLE_FSTRIM_TIMER -eq 1 ]] && chroot "$root_mnt" systemctl enable fstrim.timer 2>/dev/null || true
 
         chroot "$root_mnt" useradd -m -s /bin/bash -G sudo "$USERNAME" 2>/dev/null || true

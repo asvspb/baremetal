@@ -79,7 +79,7 @@
       использовать `${SUDO_USER:-$(logname 2>/dev/null || echo root)}`.
 - [x] **T3.6 (M)** `shellcheck -S warning` чисто по всем `.sh`
       (осознанные отключки — с комментарием `# shellcheck disable=...`).
-- [ ] **T3.7 (S)** `deploy.sh` — `timedatectl` в chroot не работает: заменить на
+- [x] **T3.7 (S)** `deploy.sh` — `timedatectl` в chroot не работает: заменить на
       установку TZ симлинком (см. T2.4), строку с timedatectl удалить.
 
 ## Фаза 4 — Верификация и документация
