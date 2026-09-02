@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.1"
+$ScriptVersion = "2026-09-02.2"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -429,6 +429,67 @@ function Install-XenlismTheme {
     }
 }
 
+# Копирование файла или каталога с индикатором прогресса и оценкой времени.
+# Крупные файлы копируются блоками по 4 МБ, поэтому прогресс виден и внутри
+# одного большого ISO. Заменяет Copy-Item в бэкапе и восстановлении.
+function Copy-WithProgress {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$DestinationDir,
+        [Parameter(Mandatory=$true)][string]$Activity
+    )
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.PSIsContainer) {
+        $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue)
+    } else {
+        $files = @($item)
+    }
+    $totalBytes = 0
+    foreach ($f in $files) { $totalBytes += $f.Length }
+    $copiedBytes = 0
+    $fileIndex = 0
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $lastProgressMs = -1000
+    $chunk = 4MB
+
+    foreach ($f in $files) {
+        $fileIndex++
+        $rel = if ($item.PSIsContainer) { $f.FullName.Substring($Path.Length).TrimStart('\') } else { $f.Name }
+        $destPath = Join-Path $DestinationDir $rel
+        $destParent = Split-Path -Path $destPath -Parent
+        if ($destParent -and -not (Test-Path -LiteralPath $destParent)) {
+            New-Item -Path $destParent -ItemType Directory -Force | Out-Null
+        }
+        $src = [System.IO.File]::OpenRead($f.FullName)
+        $dst = [System.IO.File]::Create($destPath)
+        try {
+            $buf = New-Object byte[] $chunk
+            while (($read = $src.Read($buf, 0, $buf.Length)) -gt 0) {
+                $dst.Write($buf, 0, $read)
+                $copiedBytes += $read
+                if (($sw.ElapsedMilliseconds - $lastProgressMs) -ge 200) {
+                    $lastProgressMs = $sw.ElapsedMilliseconds
+                    $elapsedSec = [math]::Max($sw.Elapsed.TotalSeconds, 0.2)
+                    $speedBps = $copiedBytes / $elapsedSec
+                    $etaSec = 0
+                    if ($speedBps -gt 0) { $etaSec = [int](($totalBytes - $copiedBytes) / $speedBps) }
+                    $etaStr = '{0:00}:{1:00}' -f [int]($etaSec / 60), [int]($etaSec % 60)
+                    $pct = 100
+                    if ($totalBytes -gt 0) { $pct = [int](100 * $copiedBytes / $totalBytes) }
+                    $status = ('Файл {0} из {1}: {2} — {3:N1} из {4:N1} МБ, скорость {5:N1} МБ/с, осталось ~{6}' -f `
+                        $fileIndex, $files.Count, $f.Name, ($copiedBytes / 1MB), ($totalBytes / 1MB), ($speedBps / 1MB), $etaStr)
+                    Write-Progress -Activity $Activity -Status $status -PercentComplete $pct -SecondsRemaining $etaSec
+                }
+            }
+        } finally {
+            $dst.Close()
+            $src.Close()
+        }
+        [System.IO.File]::SetLastWriteTime($destPath, $f.LastWriteTime)
+    }
+    Write-Progress -Activity $Activity -Completed
+}
+
 # Сверка восстановления: каждый файл из $BackupRoot должен присутствовать на
 # разделе $DestRoot по тому же относительному пути и с тем же размером.
 # Возвращает $true, если все файлы бэкапа восстановлены корректно.
@@ -656,7 +717,7 @@ try {
                             Write-Host "  • 📀 Сохранение образа: $($item.Name)..." -ForegroundColor Gray
                             Write-Log "Бэкап образа: $($item.FullName) -> $backupDir\iso\" "DEBUG"
                             try {
-                                Copy-Item -Path $item.FullName -Destination "$backupDir\iso\" -Recurse -Force
+                                Copy-WithProgress -Path $item.FullName -DestinationDir "$backupDir\iso\" -Activity ("Бэкап образа " + $item.Name)
                             } catch {
                                 throw "Сбой копирования образа '$($item.Name)' в бэкап: $($_.Exception.Message). Переразметка отменена."
                             }
@@ -664,7 +725,7 @@ try {
                             Write-Host "  • 📁 Сохранение данных: $($item.Name)..." -ForegroundColor Gray
                             Write-Log "Бэкап данных: $($item.FullName) -> $backupDir\data\" "DEBUG"
                             try {
-                                Copy-Item -Path $item.FullName -Destination "$backupDir\data\" -Recurse -Force
+                                Copy-WithProgress -Path $item.FullName -DestinationDir "$backupDir\data\" -Activity ("Бэкап данных " + $item.Name)
                             } catch {
                                 throw "Сбой копирования данных '$($item.Name)' в бэкап: $($_.Exception.Message). Переразметка отменена."
                             }
@@ -1087,7 +1148,7 @@ try {
                     Write-Host "  ➔ Восстановление $($f.Name)..." -ForegroundColor Gray
                     Write-Log "Восстановление образа: $($f.FullName) -> $($p1.DriveLetter):\" "DEBUG"
                     try {
-                        Copy-Item -Path $f.FullName -Destination "$($p1.DriveLetter):\" -Recurse -Force
+                        Copy-WithProgress -Path $f.FullName -DestinationDir "$($p1.DriveLetter):\" -Activity ("Восстановление " + $f.Name)
                     } catch {
                         Write-Log "Сбой восстановления образа $($f.Name): $($_.Exception.Message)" "ERROR"
                         $restoreFailed = $true
@@ -1116,7 +1177,7 @@ try {
                     Write-Host "  ➔ Восстановление $($f.Name)..." -ForegroundColor Gray
                     Write-Log "Восстановление данных: $($f.FullName) -> $($destPart.DriveLetter):\" "DEBUG"
                     try {
-                        Copy-Item -Path $f.FullName -Destination "$($destPart.DriveLetter):\" -Recurse -Force
+                        Copy-WithProgress -Path $f.FullName -DestinationDir "$($destPart.DriveLetter):\" -Activity ("Восстановление " + $f.Name)
                     } catch {
                         Write-Log "Сбой восстановления данных $($f.Name): $($_.Exception.Message)" "ERROR"
                         $restoreFailed = $true
