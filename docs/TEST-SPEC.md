@@ -131,6 +131,7 @@ Makefile                # цели: test-fast, test, test-loop, test-ps
 | U-D6 | L3 | `generate_autounattend`: пароли `p&a<b>"c/d`, `//`, пустой → корректное экранирование (grep по выходу); `xmllint --noout` валиден; нет неразрешённых `__[A-Z_]+__` |
 | U-D7 | L3 | отказ без ISO Ubuntu: exit ≠ 0, сообщение про debootstrap |
 | U-D8 | L3 | `generate_autounattend`: USERNAME/HOSTNAME `a&b<c>"d` / `h&ost` → экранированы в `<Name>`/`<ComputerName>`; `xmllint --noout` валиден; нет неразрешённых `__[A-Z_]+__` |
+| U-D9 | L2 | `iana_to_windows_tz`: `Europe/Berlin` → stdout `Russian Standard Time` + предупреждение в stderr; `Europe/Moscow` → без предупреждения |
 | I-D1 | L3 | PREP_DISK на стабах: последовательность parted (7 mkpart, esp/msftres/msftdata флаги, MiB-арифметика размеров из conf) и mkfs.* (правильные устройства/метки) |
 | I-D2 | L3 | `GRUB_DISABLE_OS_PROBER=false` дописан перед update-grub (реальный sed на tmp-файле) |
 

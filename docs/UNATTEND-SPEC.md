@@ -310,5 +310,5 @@ L-T3, I-M6. В `docs/TEST-SPEC.md` §11 (ручной чек-лист) допо�
 - [x] W3 — WIN_IMAGE_INDEX документирован в deploy.conf
 - [x] W4 — самоочистка Panther (order 7) + напоминания в deploy.sh и README
 - [x] W5 — xml_escape/sed_escape для USERNAME/HOSTNAME + U-D8
-- [ ] W6 — warn при неизвестной TZ + U-D9
+- [x] W6 — warn при неизвестной TZ + U-D9
 - [ ] W7 — (опция) чистка NetworkLocation и дублей xmlns:wcm

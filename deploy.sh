@@ -32,7 +32,8 @@ enable_os_prober() {
 }
 
 # Перевод IANA-часового пояса (deploy.conf TIMEZONE) в имя Windows для
-# autounattend.xml. Для неизвестных зон оставляем значение по умолчанию.
+# autounattend.xml. Для неизвестных зон — значение по умолчанию и предупреждение
+# в stderr (stdout остаётся чистым для подстановки).
 iana_to_windows_tz() {
     case "$1" in
         Europe/Kaliningrad)                     echo "Kaliningrad Standard Time" ;;
@@ -48,7 +49,8 @@ iana_to_windows_tz() {
         Asia/Vladivostok|Asia/Sakhalin)         echo "Vladivostok Standard Time" ;;
         Asia/Magadan)                           echo "Magadan Standard Time" ;;
         Asia/Kamchatka)                         echo "Kamchatka Standard Time" ;;
-        *)                                      echo "Russian Standard Time" ;;
+        *)  warn "Неизвестный часовой пояс '$1' — используется Russian Standard Time (см. deploy.conf TIMEZONE)."
+            echo "Russian Standard Time" ;;
     esac
 }
 

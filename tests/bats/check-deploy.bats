@@ -43,7 +43,9 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
 }
 
 @test "U-D1: iana_to_windows_tz — неизвестная зона -> дефолт Russian Standard Time" {
-    run deploy_run "iana_to_windows_tz 'Mars/Olympus'"
+    # 2>/dev/null: предупреждение о неизвестной зоне (см. U-D9) идёт в stderr,
+    # здесь проверяется только stdout-контракт
+    run deploy_run "iana_to_windows_tz 'Mars/Olympus' 2>/dev/null"
     assert_success
     assert_output "Russian Standard Time"
 }
@@ -52,6 +54,24 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
     run deploy_run "part_dev /dev/nvme0n1 6"
     assert_success
     assert_output "/dev/nvme0n1p6"
+}
+
+@test "U-D9: iana_to_windows_tz — Europe/Berlin: stdout дефолт + предупреждение в stderr" {
+    run deploy_run "iana_to_windows_tz 'Europe/Berlin' 2>/dev/null"
+    assert_success
+    assert_output "Russian Standard Time"
+
+    run deploy_run "iana_to_windows_tz 'Europe/Berlin' 2>&1 >/dev/null"
+    assert_success
+    assert_output --partial "Неизвестный часовой пояс"
+    # в stderr не утекает само значение (строка warn содержит имя зоны — сравниваем строку целиком)
+    refute_line "Russian Standard Time"
+}
+
+@test "U-D9: iana_to_windows_tz — Europe/Moscow: без предупреждения" {
+    run deploy_run "iana_to_windows_tz 'Europe/Moscow'"
+    assert_success
+    assert_output "Russian Standard Time"
 }
 
 @test "U-D2: part_dev — sda без суффикса" {
