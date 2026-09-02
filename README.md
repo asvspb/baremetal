@@ -58,6 +58,22 @@ Set-ExecutionPolicy Bypass -Scope Process -Force
 
 ---
 
+## 🧪 Тестирование (TEST-SPEC.md)
+
+```bash
+bash tests/setup.sh     # один раз: bats-core, pwsh, xmllint (idempotent)
+make test-fast          # L0–L3: статика + юниты + интеграция на заглушках (без root, ~1 мин)
+sudo -n make test       # = test-fast + L1 (парсинг ps1 через pwsh) + L5 (dry-run E2E против golden)
+sudo -n make test-loop  # L4: реальные parted/mkfs на loop-устройствах (только /dev/loop*)
+```
+
+* Уровни: L0 статика → L1 парсинг ps1 → L2 юниты → L3 интеграция на стабах → L4 loop → L5 dry-run E2E (см. `TEST-SPEC.md`).
+* **Безопасность:** тесты никогда не пишут на реальные диски; L3 крутится вокруг несуществующих `/dev/fakedisk*`, L4 — только `/dev/loop*` с проверкой имени устройства; заглушка `dd` всегда возвращает ошибку.
+* `make test-fast` подключен к pre-commit hook (при отсутствии deps — предупреждение, коммит не блокируется).
+* pwsh недоступен → уровень L1 выдаёт SKIP (штатная деградация), статический контроль остаётся в `check-files.sh`.
+
+---
+
 ## 📜 Основные скрипты проекта:
 
 1. 🔌 [**`make-boot-usb.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/make-boot-usb.sh) — создание загрузочных флешек под Linux.
