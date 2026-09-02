@@ -59,7 +59,7 @@
       - `ENABLE_SHARED_AUTOMOUNT` → условная запись fstab-строки `/mnt/Shared`;
       - `ROOT_FSTYPE`/`HOME_FSTYPE` → либо реализовать (ext4/btrfs в mkfs+fstab),
         либо удалить из conf; вариант «в комментариях btrfs/f2fs/xfs» убрать.
-- [ ] **T2.5 (M)** `make-boot-usb.sh`: копировать пакет на раздел данных
+- [x] **T2.5 (M)** `make-boot-usb.sh`: копировать пакет на раздел данных
       (`split-home.sh`, `deploy.sh`, `deploy.conf`, `templates/`) — как в ps1-версии;
       устранить расхождение с README.
 - [ ] **T2.6 (S)** `deploy.conf`: `WIN_PASSWORD` (по умолчанию пусто) +

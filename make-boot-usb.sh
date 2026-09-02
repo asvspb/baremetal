@@ -326,6 +326,53 @@ restore_files() {
 }
 
 # ------------------------------------------------------------------------------
+# 3b. Копирование пакета Deploy Baremetal на раздел данных (как в ps1-версии)
+# ------------------------------------------------------------------------------
+copy_deploy_package() {
+    local pkg_part="$P1"
+    if [[ "$DATA_FS" != "none" && -b "$P3" ]]; then
+        pkg_part="$P3"
+    fi
+
+    # Пакет должен лежать рядом со скриптом make-boot-usb.sh
+    local src_dir="$SCRIPT_DIR"
+    if [[ ! -f "$src_dir/deploy.sh" || ! -d "$src_dir/templates" ]]; then
+        warn "Пакет deploy-baremetal (deploy.sh / templates/) не найден рядом со скриптом — копирование пропущено."
+        return 0
+    fi
+
+    info "Копирование пакета Deploy Baremetal на раздел данных [$pkg_part]..."
+    local mnt_pkg="/tmp/mnt_pkg_$$"
+    mkdir -p "$mnt_pkg"
+    if ! mount "$pkg_part" "$mnt_pkg"; then
+        rm -rf "$mnt_pkg"
+        warn "Не удалось примонтировать раздел данных $pkg_part — копирование пакета пропущено."
+        return 0
+    fi
+
+    local target_dir="$mnt_pkg/deploy-baremetal"
+    mkdir -p "$target_dir"
+
+    local ok=1
+    # Основные скрипты развертывания + конфигурация + шаблоны autounattend
+    for f in split-home.sh deploy.sh deploy.conf; do
+        if [[ -f "$src_dir/$f" ]]; then
+            cp -r "$src_dir/$f" "$target_dir/" || { warn "Ошибка копирования $f на раздел данных."; ok=0; }
+        fi
+    done
+    cp -r "$src_dir/templates" "$target_dir/" || { warn "Ошибка копирования templates/ на раздел данных."; ok=0; }
+
+    umount "$mnt_pkg" 2>/dev/null || true
+    rm -rf "$mnt_pkg"
+
+    if (( ok == 1 )); then
+        success "Пакет Deploy Baremetal скопирован в ${pkg_part}:/deploy-baremetal/ (split-home.sh, deploy.sh, deploy.conf, templates/)."
+    else
+        warn "Копирование пакета завершилось с ошибками — проверьте раздел данных."
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # Замер скорости чтения / записи
 # ------------------------------------------------------------------------------
 run_speed_test() {
@@ -719,6 +766,9 @@ VJSON_EOF
 
     # Восстановление файлов пользователя
     restore_files
+
+    # Копирование пакета развертывания на раздел данных (как в ps1-версии)
+    copy_deploy_package
 
     echo
     success "======================================================================"
