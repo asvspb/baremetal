@@ -139,6 +139,34 @@ check_drive_integrity() {
 # ------------------------------------------------------------------------------
 # 2. Сканирование и резервное копирование данных (Backup)
 # ------------------------------------------------------------------------------
+
+# Выбор каталога временного хранения бэкапа. Если /tmp — tmpfs (Live-среда,
+# данные в нём живут в ОЗУ и не переживут перезагрузку), предлагаем путь
+# пользователя или /var/tmp. Возвращает каталог в переменной BACKUP_DIR.
+choose_backup_dir() {
+    local tmp_fs
+    tmp_fs=$(df -T /tmp 2>/dev/null | awk 'NR==2 {print $2}')
+    if [[ "$tmp_fs" == "tmpfs" ]]; then
+        local def_dir="/var/tmp/usb_backup_$$"
+        read -rp "Каталог /tmp — это tmpfs (Live-среда). Укажите путь для бэкапа [${def_dir}]: " custom_dir
+        BACKUP_DIR="${custom_dir:-$def_dir}"
+    else
+        BACKUP_DIR="/tmp/usb_backup_$$"
+    fi
+    mkdir -p "$BACKUP_DIR" || die "Не удалось создать каталог бэкапа: $BACKUP_DIR"
+}
+
+# Проверка свободного места: на носителе бэкапа должно быть >= объёма данных x1.1.
+check_backup_space() {
+    local need_kb avail_kb
+    need_kb=$(( $1 * 11 / 10 / 1024 + 1 ))
+    avail_kb=$(df -Pk "$BACKUP_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
+    if [[ -z "$avail_kb" || "$avail_kb" -lt "$need_kb" ]]; then
+        die "Недостаточно места для бэкапа в $BACKUP_DIR: нужно ~$(( need_kb / 1024 )) МБ, свободно ${avail_kb:-0} КБ."
+    fi
+    info "Места для бэкапа достаточно: нужно ~$(( need_kb / 1024 )) МБ, свободно $(( avail_kb / 1024 )) МБ."
+}
+
 backup_existing_files() {
     local parts=()
     while IFS= read -r p; do
@@ -157,6 +185,8 @@ backup_existing_files() {
             part_bytes=$(du -sb --exclude="lost+found" --exclude="System Volume Information" "$tmp_scan" 2>/dev/null | awk '{print $1}' || echo 0)
             total_bytes=$(( total_bytes + part_bytes ))
             umount "$tmp_scan" 2>/dev/null || true
+        else
+            warn "Раздел $part не удалось примонтировать для оценки данных."
         fi
     done
     rm -rf "$tmp_scan"
@@ -171,6 +201,8 @@ backup_existing_files() {
 
         if [[ "${ans_b,,}" =~ ^(д|да|y|yes)$ ]]; then
             DO_RESTORE=1
+            choose_backup_dir
+            check_backup_space "$total_bytes"
             mkdir -p "$BACKUP_DIR/iso" "$BACKUP_DIR/data"
             info "Копирование файлов во временное хранилище на ПК..."
 
@@ -179,13 +211,22 @@ backup_existing_files() {
             for part in "${parts[@]}"; do
                 if mount -o ro "$part" "$tmp_m" 2>/dev/null; then
                     # Копируем ISO/IMG/VHD в папку ISO, остальное в папку DATA
-                    find "$tmp_m" -maxdepth 2 -type f \( -name "*.iso" -o -name "*.img" -o -name "*.vhd" -o -name "*.wim" \) -exec cp -v {} "$BACKUP_DIR/iso/" \; 2>/dev/null || true
-                    
+                    if ! find "$tmp_m" -maxdepth 2 -type f \( -name "*.iso" -o -name "*.img" -o -name "*.vhd" -o -name "*.wim" \) -exec cp -v {} "$BACKUP_DIR/iso/" \;; then
+                        umount "$tmp_m" 2>/dev/null || true
+                        die "Сбой копирования ISO-образов с раздела $part — переразметка отменена. Бэкап сохранен: $BACKUP_DIR"
+                    fi
+
                     # Копируем все остальные пользовательские файлы и каталоги (кроме ISO и служебных)
-                    rsync -a --exclude="*.iso" --exclude="*.img" --exclude="*.vhd" --exclude="*.wim" \
+                    if ! rsync -a --exclude="*.iso" --exclude="*.img" --exclude="*.vhd" --exclude="*.wim" \
                           --exclude="System Volume Information" --exclude="lost+found" --exclude="ventoy" \
-                          "$tmp_m/" "$BACKUP_DIR/data/" 2>/dev/null || true
+                          "$tmp_m/" "$BACKUP_DIR/data/"; then
+                        umount "$tmp_m" 2>/dev/null || true
+                        die "Сбой копирования данных с раздела $part — переразметка отменена. Бэкап сохранен: $BACKUP_DIR"
+                    fi
                     umount "$tmp_m" 2>/dev/null || true
+                else
+                    rm -rf "$tmp_m"
+                    die "Раздел $part не удалось примонтировать для бэкапа — данные с него не сохранить. Переразметка отменена."
                 fi
             done
             rm -rf "$tmp_m"
@@ -197,6 +238,37 @@ backup_existing_files() {
 # ------------------------------------------------------------------------------
 # 3. Восстановление сохраненных файлов
 # ------------------------------------------------------------------------------
+
+# Сверка восстановления: каждый файл из $1 (каталог бэкапа) должен присутствовать
+# в $2 (смонтированный раздел флешки) с тем же размером. Возвращает 1 при
+# расхождении, подробности пишет в warn.
+verify_restored_tree() {
+    local backup_root="$1" dest_root="$2"
+    local f rel size dsize n_files=0 n_bytes=0 bad=0
+    while IFS= read -r -d '' f; do
+        rel="${f#"$backup_root"/}"
+        if [[ ! -e "$dest_root/$rel" ]]; then
+            warn "После восстановления не найден файл: $rel"
+            bad=1
+            continue
+        fi
+        size=$(stat -c %s "$f")
+        dsize=$(stat -c %s "$dest_root/$rel")
+        n_files=$(( n_files + 1 ))
+        n_bytes=$(( n_bytes + dsize ))
+        if (( size != dsize )); then
+            warn "Размер файла $rel после восстановления отличается (бэкап: $size, флешка: $dsize байт)."
+            bad=1
+        fi
+    done < <(find "$backup_root" -type f -print0 2>/dev/null)
+
+    if (( bad )); then
+        warn "Сверка восстановления НЕ пройдена: $n_files файлов из $backup_root."
+        return 1
+    fi
+    info "Сверка восстановления пройдена: $n_files файлов, $n_bytes байт совпадают с бэкапом."
+}
+
 restore_files() {
     (( DO_RESTORE == 1 )) || return 0
     [[ -d "$BACKUP_DIR" ]] || return 0
@@ -208,27 +280,47 @@ restore_files() {
         info "Перенос образов (.iso / .img) на Раздел 1 [${LABEL_P1}]..."
         local mnt_p1="/tmp/mnt_res_p1_$$"
         mkdir -p "$mnt_p1"
-        mount "$P1" "$mnt_p1"
-        cp -a "$BACKUP_DIR/iso/"* "$mnt_p1/" 2>/dev/null || true
-        umount "$mnt_p1"
+        mount "$P1" "$mnt_p1" || die "Не удалось примонтировать раздел $P1 для восстановления ISO."
+        if ! cp -a "$BACKUP_DIR/iso/." "$mnt_p1/"; then
+            umount "$mnt_p1" 2>/dev/null || true
+            rm -rf "$mnt_p1"
+            die "Сбой копирования ISO-образов на раздел $P1. Бэкап сохранен: $BACKUP_DIR"
+        fi
+        chown -R "${SUDO_USER:-asv-spb}:${SUDO_USER:-asv-spb}" "$mnt_p1/" 2>/dev/null || true
+        local iso_ok=1
+        verify_restored_tree "$BACKUP_DIR/iso" "$mnt_p1" || iso_ok=0
+        umount "$mnt_p1" 2>/dev/null || true
         rm -rf "$mnt_p1"
+        if (( iso_ok != 1 )); then
+            die "ISO-образы восстановлены с ошибками. Резервная копия НЕ удалена: $BACKUP_DIR"
+        fi
     fi
 
     # 2. Возвращаем пользовательские данные на раздел 3 (или раздел 1, если разделов нет)
     if [[ -d "$BACKUP_DIR/data" ]] && [[ $(ls -A "$BACKUP_DIR/data" 2>/dev/null) ]]; then
         local dest_part="$P1"
         [[ "$DATA_FS" != "none" && -b "$P3" ]] && dest_part="$P3"
-        
+
         info "Перенос документов и пользовательских файлов на [${LABEL_P3:-$LABEL_P1}]..."
         local mnt_pd="/tmp/mnt_res_pd_$$"
         mkdir -p "$mnt_pd"
-        mount "$dest_part" "$mnt_pd"
-        cp -a "$BACKUP_DIR/data/"* "$mnt_pd/" 2>/dev/null || true
+        mount "$dest_part" "$mnt_pd" || die "Не удалось примонтировать раздел $dest_part для восстановления данных."
+        if ! cp -a "$BACKUP_DIR/data/." "$mnt_pd/"; then
+            umount "$mnt_pd" 2>/dev/null || true
+            rm -rf "$mnt_pd"
+            die "Сбой копирования данных на раздел $dest_part. Бэкап сохранен: $BACKUP_DIR"
+        fi
         chown -R "${SUDO_USER:-asv-spb}:${SUDO_USER:-asv-spb}" "$mnt_pd/" 2>/dev/null || true
-        umount "$mnt_pd"
+        local data_ok=1
+        verify_restored_tree "$BACKUP_DIR/data" "$mnt_pd" || data_ok=0
+        umount "$mnt_pd" 2>/dev/null || true
         rm -rf "$mnt_pd"
+        if (( data_ok != 1 )); then
+            die "Данные восстановлены с ошибками. Резервная копия НЕ удалена: $BACKUP_DIR"
+        fi
     fi
 
+    # Временную копию удаляем только после успешной сверки восстановления
     rm -rf "$BACKUP_DIR"
     success "🎉 Все сохраненные файлы успешно возвращены на накопитель!"
 }
