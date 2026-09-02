@@ -6,4 +6,8 @@ fi
 if [[ "${STUB_RSYNC_FAIL:-0}" == "1" ]]; then
     exit 1
 fi
+if [[ "${STUB_RSYNC_NOTHING:-0}" == "1" ]]; then
+    # успех без действия: verify_restored_tree найдёт пропажу файлов (I-M4)
+    exit 0
+fi
 exec /usr/bin/rsync "$@"

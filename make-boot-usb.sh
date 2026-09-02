@@ -290,7 +290,7 @@ restore_files() {
         local mnt_p1="/tmp/mnt_res_p1_$$"
         mkdir -p "$mnt_p1"
         mount "$P1" "$mnt_p1" || die "Не удалось примонтировать раздел $P1 для восстановления ISO."
-        if ! cp -a "$BACKUP_DIR/iso/." "$mnt_p1/"; then
+        if ! rsync -a --info=progress2 "$BACKUP_DIR/iso/." "$mnt_p1/"; then
             umount "$mnt_p1" 2>/dev/null || true
             rm -rf "$mnt_p1"
             die "Сбой копирования ISO-образов на раздел $P1. Бэкап сохранен: $BACKUP_DIR"
@@ -314,7 +314,7 @@ restore_files() {
         local mnt_pd="/tmp/mnt_res_pd_$$"
         mkdir -p "$mnt_pd"
         mount "$dest_part" "$mnt_pd" || die "Не удалось примонтировать раздел $dest_part для восстановления данных."
-        if ! cp -a "$BACKUP_DIR/data/." "$mnt_pd/"; then
+        if ! rsync -a --info=progress2 "$BACKUP_DIR/data/." "$mnt_pd/"; then
             umount "$mnt_pd" 2>/dev/null || true
             rm -rf "$mnt_pd"
             die "Сбой копирования данных на раздел $dest_part. Бэкап сохранен: $BACKUP_DIR"

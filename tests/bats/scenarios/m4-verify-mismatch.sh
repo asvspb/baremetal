@@ -6,7 +6,7 @@ scenario_init usb
 # shellcheck disable=SC1091
 source "${REPO_DIR}/make-boot-usb.sh" >/dev/null 2>&1
 export STUB_DF_TYPE="ext4"
-export STUB_CP_NOTHING="1"   # cp завершается успешно, НИЧЕГО не копируя
+export STUB_RSYNC_NOTHING="1"   # rsync завершается успешно, НИЧЕГО не копируя
 TARGET_DISK="/dev/fakedisk"
 DATA_FS="none"
 P1="/dev/fakedisk1"
