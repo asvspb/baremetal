@@ -1,0 +1,64 @@
+# 🚀 Deploy Baremetal & Boot USB Engine
+
+Комплекс инструментов для автоматического создания загрузочных мультизагрузочных флешек Ventoy и полностью автономного развертывания операционных систем **Ubuntu 24.04/22.04 LTS** и **Windows 11/10 Pro** на чистый диск или в режиме Dual-Boot.
+
+---
+
+## 🛠️ Создание загрузочной флешки
+
+В проект включены интерактивные скрипты для подготовки любой флешки в **Linux** и **Windows**:
+
+### 🐧 Для Linux (Bash):
+```bash
+sudo bash ~/Dev/deploy-baremetal/make-boot-usb.sh
+```
+* **Автоматически:**
+  * Находит подключенные USB-флешки и защищает системные диски.
+  * Размечает в GPT с поддержкой UEFI Secure Boot.
+  * Создает раздел **Ventoy (exFAT)** с меткой (`FD-0`, `FD-1`, `FD-2` и т.д.) нужного размера (8 ГБ / 16 ГБ / кастомный).
+  * Устанавливает темную тему **Xenlism-Ubuntu (1080p)** и `ventoy.json`.
+  * Создает раздел данных (**F2FS со сжатием** или **exFAT** для совместимости с Android/Windows).
+  * Скрывает служебный EFI раздел `VTOYEFI`.
+  * Автоматически копирует скрипты `split-home.sh`, `deploy-baremetal` и `ubuntuInstaller` на раздел данных.
+
+### 🪟 Для Windows (PowerShell):
+Самый простой способ — двойной клик по **`make-boot-usb.bat`**: он сам запросит права Администратора через UAC и запустит мастер.
+
+Либо запустите PowerShell от имени Администратора вручную:
+```powershell
+Set-ExecutionPolicy Bypass -Scope Process -Force
+.\make-boot-usb.ps1
+```
+* Скачивает официальный Ventoy, создает разделы (`exFAT` под ISO + раздел данных `DATA`), настраивает конфигурацию и скрывает служебный раздел EFI в Проводнике Windows.
+
+> ⚠️ **Важно про кодировки файлов:**
+> * `make-boot-usb.bat` — **CP866 (OEM/DOS) + CRLF**: единственная кодировка, которую cmd.exe корректно разбирает вместе с русским текстом. Не пересохраняйте его в UTF-8 и не добавляйте `chcp 65001` — иначе строки скрипта начнут «рваться» и исполняться как команды (`'...' is not recognized as an internal or external command`).
+> * `make-boot-usb.ps1` — **UTF-8 with BOM + CRLF**: без BOM Windows PowerShell 5.1 прочитает файл как ANSI и русский текст сломается.
+
+---
+
+## 📐 Архитектура разметки накопителей серии FD:
+
+```text
+[ USB Накопитель ]
+├── Раздел 1 (exFAT, 8 / 16 ГБ) — Метка «FD-0 / FD-1 / FD-2»
+│   ├── /ventoy/theme/Xenlism-Ubuntu/ (Full HD 1080p)
+│   ├── /ventoy/ventoy.json (Разрешение и шрифты)
+│   └── (Свободное место для загрузочных .iso образов)
+│
+├── Раздел 2 (FAT16, 32 МБ) — «VTOYEFI» (Скрытый системный загрузчик)
+│
+└── Раздел 3 (F2FS / exFAT, остаток диска) — Метка «F2FS / DATA»
+    ├── split-home.sh (Разделение существующей системы)
+    ├── deploy-baremetal/ (Автономный установщик OS)
+    └── ubuntuInstaller/ (Пакет пост-установки и dotfiles)
+```
+
+---
+
+## 📜 Основные скрипты проекта:
+
+1. 🔌 [**`make-boot-usb.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/make-boot-usb.sh) — создание загрузочных флешек под Linux.
+2. 🔌 [**`make-boot-usb.ps1`**](file:///home/asv-spb/Dev/deploy-baremetal/make-boot-usb.ps1) — создание загрузочных флешек под Windows.
+3. ⚡ [**`split-home.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/split-home.sh) — безрисковое разделение текущей Ubuntu на корень (200 ГБ) и `/home` (~427 ГБ).
+4. 💻 [**`deploy.sh`**](file:///home/asv-spb/Dev/deploy-baremetal/deploy.sh) — модульный установщик чистых ОС с нуля (Ubuntu + Windows Dual-Boot).
