@@ -50,7 +50,7 @@
 - [x] **T2.2 (S)** `deploy.sh`: перед `update-grub` дописать
       `GRUB_DISABLE_OS_PROBER=false` в `/etc/default/grub` (GRUB ≥ 2.06 иначе
       не ищет Windows).
-- [ ] **T2.3 (S)** `deploy.sh`: путь debootstrap без ядра не загружается —
+- [x] **T2.3 (S)** `deploy.sh`: путь debootstrap без ядра не загружается —
       заменить на `die "Требуется ISO Ubuntu (debootstrap не поддерживается)"`.
 - [ ] **T2.4 (M)** Мёртвые опции `deploy.conf` — реализовать или убрать:
       - `TIMEZONE` → `ln -sf /usr/share/zoneinfo/$TIMEZONE` в chroot (+ в unattend);

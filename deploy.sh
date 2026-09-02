@@ -444,9 +444,13 @@ do_deploy_ubuntu() {
             echo -e "  ${C_CYAN}[dry-run]${C_RESET} unsquashfs -f -d $root_mnt /casper/filesystem.squashfs"
         fi
     else
-        info "Установка базовой системы через debootstrap (Noble 24.04 LTS)..."
-        run command -v debootstrap >/dev/null || run apt install -y -qq debootstrap
-        run debootstrap noble "$root_mnt" http://archive.ubuntu.com/ubuntu/
+        if (( DRY )); then
+            echo -e "  ${C_CYAN}[dry-run]${C_RESET} Требуется ISO Ubuntu (debootstrap не поддерживается) — реальный запуск будет остановлен"
+        else
+            # debootstrap даёт систему без ядра и загрузчика — не поддерживается.
+            # Ubuntu ставится только из ISO (unsquashfs), как и задокументировано.
+            die "Требуется ISO Ubuntu (debootstrap не поддерживается). Поместите Ubuntu ISO рядом со скриптом или укажите путь в конфигурации."
+        fi
     fi
 
     # Генерация /swapfile на 4 ГБ
