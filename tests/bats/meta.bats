@@ -83,4 +83,5 @@ make_ps1_fixture() {
     fi
     grep -q '<FirstLogonCommands>' "$tpl" || bats::fail "нет <FirstLogonCommands> в шаблоне"
     grep -q 'AllowTelemetry' "$tpl" || bats::fail "нет AllowTelemetry (телеметрия) в шаблоне"
+    grep -q 'Remove-AppxProvisionedPackage' "$tpl" || bats::fail "нет Remove-AppxProvisionedPackage (debloat) в шаблоне"
 }

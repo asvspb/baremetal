@@ -306,7 +306,7 @@ L-T3, I-M6. В `docs/TEST-SPEC.md` §11 (ручной чек-лист) допо�
 ## Чек-лист выполнения
 
 - [x] W1 — FirstLogonCommands: телеметрия + реклама (orders 1–5)
-- [ ] W2 — bloatware через provisioned+AllUsers (order 6, лог)
+- [x] W2 — bloatware через provisioned+AllUsers (order 6, лог)
 - [ ] W3 — WIN_IMAGE_INDEX документирован в deploy.conf
 - [ ] W4 — самоочистка Panther (order 7) + напоминания в deploy.sh и README
 - [ ] W5 — xml_escape/sed_escape для USERNAME/HOSTNAME + U-D8

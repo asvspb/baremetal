@@ -147,6 +147,13 @@
                     <CommandLine>reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v Start_IrisRecommendations /t REG_DWORD /d 0 /f</CommandLine>
                     <Description>Disable Start Recommendations (Win11)</Description>
                 </SynchronousCommand>
+                <!-- Удаление предустановленных UWP (bloatware): провижиненные пакеты + текущий профиль.
+                     Список консервативный; Store/Calculator/Photos/Widgets НЕ трогать. -->
+                <AsynchronousCommand wcm:action="add">
+                    <Order>6</Order>
+                    <CommandLine>powershell -NoProfile -ExecutionPolicy Bypass -Command "$log='C:\Windows\Temp\deploy-debloat.log'; $pat='^(Microsoft.BingNews|Microsoft.BingWeather|Microsoft.MicrosoftSolitaireCollection|Microsoft.WindowsFeedbackHub|Microsoft.Getstarted|Microsoft.GetHelp|Microsoft.MicrosoftOfficeHub|Microsoft.549981C3F5F10)$'; Get-AppxProvisionedPackage -Online | Where-Object { $_.DisplayName -match $pat } | ForEach-Object { $_.DisplayName | Out-File $log -Append; Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }; Get-AppxPackage -AllUsers | Where-Object { $_.Name -match $pat } | Remove-AppxPackage -AllUsers -ErrorAction SilentlyContinue"</CommandLine>
+                    <Description>Remove Bloatware (provisioned + all users)</Description>
+                </AsynchronousCommand>
             </FirstLogonCommands>
         </component>
         <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
