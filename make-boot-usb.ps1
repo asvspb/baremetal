@@ -434,7 +434,7 @@ function Test-BackupTreeMatch {
     )
     $srcFiles = @(Get-ChildItem -Path $BackupRoot -Recurse -File -Force -ErrorAction SilentlyContinue)
     if ($srcFiles.Count -eq 0) {
-        Write-Log "Сверка $Label: в бэкапе нет файлов — пропуск." "WARN"
+        Write-Log "Сверка ${Label}: в бэкапе нет файлов — пропуск." "WARN"
         return $true
     }
     $totalCount = $srcFiles.Count
@@ -445,13 +445,13 @@ function Test-BackupTreeMatch {
         $rel = $src.FullName.Substring($BackupRoot.Length).TrimStart('\')
         $destPath = Join-Path $DestRoot $rel
         if (-not (Test-Path -LiteralPath $destPath)) {
-            Write-Log "Сверка $Label: отсутствует после восстановления: $rel" "WARN"
+            Write-Log "Сверка ${Label}: отсутствует после восстановления: $rel" "WARN"
             $missingCount++
             continue
         }
         $destSize = (Get-Item -LiteralPath $destPath -Force).Length
         if ($destSize -ne $src.Length) {
-            Write-Log "Сверка $Label: размер не совпадает: $rel (бэкап $($src.Length), флешка $destSize)" "WARN"
+            Write-Log "Сверка ${Label}: размер не совпадает: $rel (бэкап $($src.Length), флешка $destSize)" "WARN"
             $mismatchCount++
         }
     }
