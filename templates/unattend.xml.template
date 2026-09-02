@@ -67,19 +67,19 @@
         <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
             <RunSynchronous>
                 <!-- 1. Синхронизация часов через UTC (часы не сбиваются с Linux) -->
-                <RunSynchronousCommand wcm:action="add" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                <RunSynchronousCommand wcm:action="add">
                     <Order>1</Order>
                     <Path>reg add "HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /t REG_DWORD /d 1 /f</Path>
                     <Description>Set Hardware Clock to UTC</Description>
                 </RunSynchronousCommand>
                 <!-- 2. Отключение Fast Startup (защита дисков от блокировки при перезагрузке в Linux) -->
-                <RunSynchronousCommand wcm:action="add" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                <RunSynchronousCommand wcm:action="add">
                     <Order>2</Order>
                     <Path>powercfg /h off</Path>
                     <Description>Disable Fast Startup and Hibernation</Description>
                 </RunSynchronousCommand>
                 <!-- 3. Отключение BitLocker Device Encryption -->
-                <RunSynchronousCommand wcm:action="add" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                <RunSynchronousCommand wcm:action="add">
                     <Order>3</Order>
                     <Path>reg add "HKLM\SYSTEM\CurrentControlSet\Control\BitLocker" /v PreventDeviceEncryption /t REG_DWORD /d 1 /f</Path>
                     <Description>Prevent Auto BitLocker</Description>
@@ -95,12 +95,11 @@
                 <HideOEMRegistrationScreens>true</HideOEMRegistrationScreens>
                 <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
                 <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
-                <NetworkLocation>Work</NetworkLocation>
                 <ProtectYourPC>3</ProtectYourPC>
             </OOBE>
             <UserAccounts>
                 <LocalAccounts>
-                    <LocalAccount wcm:action="add" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+                    <LocalAccount wcm:action="add">
                         <Name>__USERNAME__</Name>
                         <DisplayName>__USERNAME__</DisplayName>
                         <Group>Administrators</Group>
