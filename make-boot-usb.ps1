@@ -107,9 +107,16 @@ PowerShell:        $($PSVersionTable.PSVersion) (CLR: $($PSVersionTable.CLRVersi
 
 Write-Log "Скрипт make-boot-usb.ps1 запущен." "INFO"
 
-# Включение современных протоколов TLS для безопасного скачивания с GitHub
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
-Write-Log "Настроен протокол TLS 1.2 / TLS 1.3." "DEBUG"
+# Включение современных протоколов TLS для безопасного скачивания с GitHub.
+# Enum Tls13 отсутствует на .NET < 4.8 (Windows PowerShell 5.1 + старый .NET),
+# поэтому пробуем включить его в try/catch и молча довольствуемся TLS 1.2.
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.SecurityProtocolType]::Tls13
+    Write-Log "Настроен протокол TLS 1.2 / TLS 1.3." "DEBUG"
+} catch {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Write-Log "TLS 1.3 недоступен (старый .NET) — используется TLS 1.2." "DEBUG"
+}
 
 # Настройка UTF-8 для корректного отображения русского языка.
 chcp 65001 > $null
