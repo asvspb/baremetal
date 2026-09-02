@@ -15,6 +15,10 @@
 param()
 
 $ErrorActionPreference = "Stop"
+# Версия сборки: меняется при каждой правке скрипта. 
+# Выводится в баннере и первой строкой лога — сверяйте с шапкой 
+# актуального файла в репозитории deploy-baremetal.
+$ScriptVersion = "2026-09-02.1"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -92,6 +96,7 @@ if ($EnableDebugLogging) {
   VENTOY BOOT USB BUILDER & AUTOMATOR — СИСТЕМНЫЙ ЛОГ НА НОСИТЕЛЕ
 ======================================================================
 Дата запуска:      $(Get-Date -Format "yyyy-MM-dd HH:mm:ss (zzz)")
+Версия скрипта:    $ScriptVersion
 ОС:                $($osInfo.Caption) (Версия: $($osInfo.Version), Сборка: $($osInfo.BuildNumber))
 Архитектура ОС:    $($osInfo.OSArchitecture)
 PowerShell:        $($PSVersionTable.PSVersion) (CLR: $($PSVersionTable.CLRVersion))
@@ -140,6 +145,7 @@ if (-not $isAdmin) {
 Clear-Host
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host "   🛠️ VENTOY BOOT USB BUILDER & AUTOMATOR (WINDOWS / POWERSHELL)      " -ForegroundColor Cyan
+Write-Host "   Версия сборки: $ScriptVersion" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 if ($EnableDebugLogging) {
     Write-Host "  📝 Системное логирование: ПРЯМО НА ЦЕЛЕВОЙ НОСИТЕЛЬ ($logFileName)" -ForegroundColor Yellow
