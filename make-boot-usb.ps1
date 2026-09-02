@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.5"
+$ScriptVersion = "2026-09-02.6"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -455,6 +455,8 @@ function Install-XenlismTheme {
 # Копирование файла или каталога с индикатором прогресса и оценкой времени.
 # Крупные файлы копируются блоками по 4 МБ, поэтому прогресс виден и внутри
 # одного большого ISO. Заменяет Copy-Item в бэкапе и восстановлении.
+# The structure is preserved from the name of the copied element (semantics of
+# Copy-Item -Recurse: the directory dir is copied to dest\dir\...).
 function Copy-WithProgress {
     param(
         [Parameter(Mandatory=$true)][string]$Path,
@@ -477,7 +479,7 @@ function Copy-WithProgress {
 
     foreach ($f in $files) {
         $fileIndex++
-        $rel = if ($item.PSIsContainer) { $f.FullName.Substring($Path.Length).TrimStart('\') } else { $f.Name }
+        $rel = if ($item.PSIsContainer) { $item.Name + '\' + $f.FullName.Substring($Path.Length).TrimStart('\') } else { $f.Name }
         $destPath = Join-Path $DestinationDir $rel
         $destParent = Split-Path -Path $destPath -Parent
         if ($destParent -and -not (Test-Path -LiteralPath $destParent)) {
