@@ -14,6 +14,7 @@
 | [CODER-PROMPT.md](CODER-PROMPT.md) | Промпт исполнителя по ROADMAP (исторический, задача закрыта) | архив |
 | [CODER-PROMPT-TESTS.md](CODER-PROMPT-TESTS.md) | Промпт исполнителя по TEST-SPEC (исторический, задача закрыта) | архив |
 | [CODER-PROMPT-UNATTEND.md](CODER-PROMPT-UNATTEND.md) | Промпт исполнителя по UNATTEND-SPEC (парный к 🆕 спеке) | 🆕 парный |
+| [AI-REVIEW-PROMPT.md](AI-REVIEW-PROMPT.md) | Промпт внешним ИИ (Claude/GPT/Gemini): оценка архитектуры + фича «скачивание дистрибутивов» (вставлять в чат, доступ к репо не нужен) | 🆕 к рассылке |
 
 Хронология работы зафиксирована в истории git: `snapshot` → `T0.1–T4.3` (ревью)
 → `T0–T5` (тесты) → `fix/check` → `T1–T4` (FIX-SPEC) → `S0–S5` (SPLIT-SPEC).
