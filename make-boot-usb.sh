@@ -41,6 +41,48 @@ for cmd in parted mkfs.exfat mkfs.f2fs wget tar dd dosfsck rsync; do
     fi
 done
 
+# Тихая закачка wget в фоне + однострочная шкала прогресса:
+# [############------------------]  40%  84 КБ/с  ETA 03:12
+# $1 — url, $2 — файл назначения. Возвращает rc wget.
+download_with_progress() {
+    local url=$1 out=$2
+    local total=0
+    total=$(curl -sIL --max-time 15 "$url" 2>/dev/null | tr -d '\r' \
+        | awk 'tolower($1)=="content-length:" {v=$2} END {print v+0}')
+    ( wget -c -q --tries=5 --timeout=60 -O "$out" "$url" ) &
+    local wpid=$!
+    local last cur speed eta bar filled i pct
+    last=$(stat -c %s "$out" 2>/dev/null || echo 0)
+    while kill -0 "$wpid" 2>/dev/null; do
+        sleep 1
+        cur=$(stat -c %s "$out" 2>/dev/null || echo 0)
+        speed=$((cur - last)); last=$cur
+        (( speed < 0 )) && speed=0
+        if (( total > 0 )); then
+            (( total < cur )) && total=$cur
+            pct=$((cur * 100 / total))
+            filled=$((cur * 30 / total))
+            bar=""
+            for ((i = 0; i < 30; i++)); do
+                (( i < filled )) && bar+="#" || bar+="-"
+            done
+            if (( speed > 1024 )); then
+                eta=$(((total - cur) / speed))
+                printf '\r    [%s] %3d%%  %4d КБ/с  ETA %02d:%02d' \
+                    "$bar" "$pct" "$((speed / 1024))" "$((eta / 60))" "$((eta % 60))"
+            else
+                printf '\r    [%s] %3d%%  скачивание...' "$bar" "$pct"
+            fi
+        else
+            printf '\r    скачано %d КБ  (%d КБ/с)' "$((cur / 1024))" "$((speed / 1024))"
+        fi
+    done
+    wait "$wpid"
+    local rc=$?
+    printf '\r%*s\r' 40 ''
+    return "$rc"
+}
+
 ensure_ventoy_tool() {
     if [[ -x "${VENTOY_DIR}/Ventoy2Disk.sh" ]]; then
         return 0
@@ -50,17 +92,14 @@ ensure_ventoy_tool() {
     # чтобы случайно не подхватить чужую/битую копию Ventoy2Disk.sh)
     local url="https://github.com/ventoy/Ventoy/releases/download/v${VENTOY_VERSION}/ventoy-${VENTOY_VERSION}-linux.tar.gz"
     local tarball="/tmp/ventoy-${VENTOY_VERSION}-linux.tar.gz"
-    info "Скачивание Ventoy v${VENTOY_VERSION} (~18 МБ):"
-    echo "    $url"
+    info "Скачивание Ventoy v${VENTOY_VERSION} (~18 МБ) с github.com..."
     mkdir -p "$VENTOY_DIR"
     # Битый недокачанный архив бесполезен для докачки (-c): удаляем и качаем целиком
     if [[ -f "$tarball" ]] && ! tar -tzf "$tarball" &>/dev/null; then
         warn "Обнаружен битый ${tarball} — скачиваю заново."
         rm -f "$tarball"
     fi
-    # Видимый прогресс + докачка + ретраи (медленный маршрут до GitHub CDN не
-    # должен выглядеть как зависание); прогресс wget пишется в stderr
-    wget -c --tries=5 --timeout=60 --progress=dot:giga -O "$tarball" "$url" \
+    download_with_progress "$url" "$tarball" \
         || die "Не удалось скачать Ventoy v${VENTOY_VERSION}: $url (проверьте сеть/прокси; частично скачанный файл будет докачан при повторном запуске)."
     tar -tzf "$tarball" &>/dev/null || die "Архив Ventoy повреждён: $tarball"
     tar -xzf "$tarball" -C "/tmp" || die "Не удалось распаковать ${tarball} в /tmp"
