@@ -8,6 +8,7 @@
   [1;36m[dry-run][0m umount /dev/nvme0n1p5
   [1;36m[dry-run][0m umount /dev/nvme0n1p6
   [1;36m[dry-run][0m umount /dev/nvme0n1p7
+  [1;36m[dry-run][0m umount /dev/nvme0n1p8
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 mklabel gpt
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 mkpart EFI fat32 1MiB 501MiB
   [1;36m[dry-run][0m parted -s /dev/nvme0n1 set 1 boot on
