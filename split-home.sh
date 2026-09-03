@@ -311,7 +311,13 @@ info "Безопасное сжатие ext4 до 195 ГБ (с запасом д
 run resize2fs "$P7" 195G
 
 info "Изменение границы раздела p7 в таблице GPT (до 200 ГБ)..."
-run parted -s "$DISK" resizepart 7 "${P7_END_SECTOR}s"
+# parted 3.4 при СЖАТИИ раздела не подавляет подтверждение флагом -s — нужен
+# ---pretend-input-tty и ответ «Yes» на stdin (в dry-run ниже видна вся команда).
+if (( DRY )); then
+    echo -e "  ${C_CYAN}[dry-run]${C_RESET} parted ---pretend-input-tty $DISK resizepart 7 ${P7_END_SECTOR}s <<< \"Yes\""
+else
+    parted ---pretend-input-tty "$DISK" resizepart 7 "${P7_END_SECTOR}s" <<< "Yes"
+fi
 run partprobe "$DISK" || true
 run sleep 2
 

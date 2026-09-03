@@ -20,14 +20,14 @@
 - [x] **A0.1 (S)** Проверить `git status` чистый; создать ветку
       `fix/split-adapt` (не коммитить в `main`).
       *Приёмка:* `git branch --show-current` = `fix/split-adapt`; `git status` чистый.
-- [ ] **A0.2 (S)** Зафиксировать «красный» эталон: `sudo bash split-home.sh --dry-run`
+- [x] **A0.2 (S)** Зафиксировать «красный» эталон: `sudo bash split-home.sh --dry-run`
       должен упасть с «Раздел /dev/nvme0n1p8 уже существует! Система уже разделена?».
       Сохранить вывод: `... > /tmp/split-adapt-red.txt 2>&1; echo rc=$? >> /tmp/split-adapt-red.txt`.
       *Приёмка:* в файле есть сообщение об ошибке и `rc=1` — это точка сравнения «до/после».
 
 ## Фаза 1 — Блокеры (правки кода)
 
-- [ ] **A6 (S)** 🔴 `parted resizepart` сжатие: подтверждение.
+- [x] **A6 (S)** 🔴 `parted resizepart` сжатие: подтверждение.
       `parted -s ... resizepart 7 ...` обрывается (проверено parted 3.4) — заменить
       на `run parted ---pretend-input-tty "$DISK" resizepart 7 "${P7_END_SECTOR}s" <<< "Yes"`.
       Независим от A1–A2, делать первым.
