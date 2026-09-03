@@ -32,7 +32,7 @@
       на `run parted ---pretend-input-tty "$DISK" resizepart 7 "${P7_END_SECTOR}s" <<< "Yes"`.
       Независим от A1–A2, делать первым.
       *Приёмка:* `bash -n`/`shellcheck` 0; shrink на loop-образе проходит без интерактива (rc=0).
-- [ ] **A1 (M)** 🔴 Константы и охрана разметки: `P8` → `P9`, завести `P8_DISTR`,
+- [x] **A1 (M)** 🔴 Константы и охрана разметки: `P8` → `P9`, завести `P8_DISTR`,
       отпечаток Distr (`EXPECT_DISTR_START=1745784832`, `EXPECT_DISTR_PARTUUID=58c56411-…`),
       сверка размера p7 (`EXPECT_P7_SIZE_SECTORS=1107075072`); заменить die «p8 существует»
       на тройную проверку (нет p9 / нет Distr / отпечаток не сошёлся).

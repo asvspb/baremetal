@@ -78,13 +78,18 @@ run()     { if (( DRY )); then echo -e "  ${C_CYAN}[dry-run]${C_RESET} $*"; else
 
 # Константы целевого оборудования
 DISK="/dev/nvme0n1"
+PART_SYS_ROOT="/sys/block/nvme0n1"     # отпечатки разделов (тесты переопределяют на tmp-каталог)
 P7="${DISK}p7"
-P8="${DISK}p8"
+P8_DISTR="${DISK}p8"                   # существующий exfat-раздел Distr — НЕ ЗАТРАГИВАЕТСЯ
+P9="${DISK}p9"                         # новый раздел /home
 EXPECT_P7_UUID="1b8e3e50-2e22-4088-a3a5-396293780ff2"
+EXPECT_P7_SIZE_SECTORS=1107075072      # p7 уже сжат с 627 до 528 ГБ (2026-09-03)
+EXPECT_DISTR_START=1745784832          # стартовый сектор p8-Distr
+EXPECT_DISTR_PARTUUID="58c56411-3703-410a-bda7-41278b287bca"
 P7_START_SECTOR=638709760
 P7_SIZE_SECTORS=419430400     # 200 GiB (200 * 1024 * 1024 * 2)
 P7_END_SECTOR=$((P7_START_SECTOR + P7_SIZE_SECTORS - 1)) # 1058140159
-P8_START_SECTOR=$((P7_END_SECTOR + 1))                   # 1058140160
+P9_START_SECTOR=$((P7_END_SECTOR + 1))                   # 1058140160
 TARGET_SHRINK_GB=195          # до какого размера сжимаем ФС p7 (запас до границы 200 ГБ)
 USED_LIMIT_GB=190             # отказ, если занято в /home >= этого (ГБ): не влезет после сжатия
 
@@ -108,6 +113,42 @@ parse_args() {
         esac
         shift
     done
+}
+
+# ------------------------------------------------------------------------------
+# Охрана разметки (A1): до первого parted/mkfs сверяем диск с отпечатками ТЕКУЩЕЙ
+# разметки (p7 уже сжат, p8-Distr существует, p9 ещё нет). start/size читаются
+# через PART_SYS_ROOT — тест (A4) подменяет его на tmp-каталог с фейковыми файлами.
+# ------------------------------------------------------------------------------
+check_partition_layout() {
+    # p9 существует = операция уже выполнялась на этом диске — стоп
+    if [[ -e "${PART_SYS_ROOT}/nvme0n1p9" ]]; then
+        die "Раздел $P9 уже существует! Похоже, операция уже выполнялась."
+    fi
+    # без p8-Distr нет свободного промежутка с гарантированным концом под p9
+    if [[ ! -e "${PART_SYS_ROOT}/nvme0n1p8" ]]; then
+        die "Разметка не соответствует: не найден раздел Distr ($P8_DISTR). Обновите константы в скрипте."
+    fi
+
+    # отпечаток p8-Distr: тип exfat + PARTUUID + стартовый сектор
+    local cur_d8_type cur_d8_partuuid d8_start
+    cur_d8_type=$(blkid -s TYPE -o value "$P8_DISTR" || echo "")
+    cur_d8_partuuid=$(blkid -s PARTUUID -o value "$P8_DISTR" || echo "")
+    d8_start=$(cat "${PART_SYS_ROOT}/nvme0n1p8/start" 2>/dev/null || echo "")
+    [[ "$cur_d8_type" == "exfat" ]] \
+        || die "Тип ФС на $P8_DISTR: '${cur_d8_type:-?}', ожидался exfat (Distr). Разметка изменилась — обновите константы."
+    [[ "$cur_d8_partuuid" == "$EXPECT_DISTR_PARTUUID" ]] \
+        || die "PARTUUID $P8_DISTR: '${cur_d8_partuuid:-?}', ожидался '$EXPECT_DISTR_PARTUUID'. Разметка изменилась — обновите константы."
+    [[ "$d8_start" -eq "$EXPECT_DISTR_START" ]] \
+        || die "Начальный сектор $P8_DISTR ($d8_start) не совпадает с ожидаемым ($EXPECT_DISTR_START). Разметка изменилась — обновите константы."
+
+    # p7: стартовый сектор (инвариант) и текущий размер (уже сжат до 528 ГБ)
+    S7=$(cat "${PART_SYS_ROOT}/nvme0n1p7/start")
+    Z7=$(cat "${PART_SYS_ROOT}/nvme0n1p7/size")
+    [[ "$S7" -eq "$P7_START_SECTOR" ]] \
+        || die "Начальный сектор $P7 ($S7) не совпадает с ожидаемым ($P7_START_SECTOR)"
+    [[ "$Z7" -eq "$EXPECT_P7_SIZE_SECTORS" ]] \
+        || die "Размер $P7 ($Z7 секторов) не совпадает с ожидаемым ($EXPECT_P7_SIZE_SECTORS). p7 уже сжат или расширен — разметка изменилась, обновите константы."
 }
 
 # ------------------------------------------------------------------------------
@@ -136,18 +177,13 @@ fi
 # ------------------------------------------------------------------------------
 [[ -b "$DISK" ]] || die "Накопитель $DISK не найден!"
 [[ -b "$P7" ]]   || die "Раздел $P7 не найден!"
-if [[ -b "$P8" ]]; then
-    die "Раздел $P8 уже существует! Система уже разделена?"
-fi
+
+check_partition_layout
 
 CUR_P7_TYPE=$(blkid -s TYPE -o value "$P7" || echo "")
 CUR_P7_UUID=$(blkid -s UUID -o value "$P7" || echo "")
 [[ "$CUR_P7_TYPE" == "ext4" ]] || die "Тип ФС на $P7: '$CUR_P7_TYPE', ожидался ext4"
 [[ "$CUR_P7_UUID" == "$EXPECT_P7_UUID" ]] || die "UUID $P7 = '$CUR_P7_UUID', ожидался '$EXPECT_P7_UUID'"
-
-S7=$(cat /sys/block/nvme0n1/nvme0n1p7/start)
-Z7=$(cat /sys/block/nvme0n1/nvme0n1p7/size)
-[[ "$S7" -eq "$P7_START_SECTOR" ]] || die "Начальный сектор $P7 ($S7) не совпадает с ожидаемым ($P7_START_SECTOR)"
 
 info "Текущий размер p7: $(( Z7 * 512 / 1024 / 1024 / 1024 )) ГБ"
 info "Целевой размер p7: 200 ГБ (корень /)"
@@ -201,7 +237,7 @@ MNT_HOME="/tmp/split_home_mnt"
 info "Монтирование разделов для переноса файлов..."
 run mkdir -p "$MNT_ROOT" "$MNT_HOME"
 run mount "$P7" "$MNT_ROOT"
-run mount "$P8" "$MNT_HOME"
+run mount "$P9" "$MNT_HOME"
 run fstrim -v "$MNT_HOME" 2>/dev/null || true
 
 if ! (( DRY )); then
@@ -224,7 +260,7 @@ $verify_out
 
     # fstab обновляется ДО удаления старого /home: прерывание между шагами
     # оставляет максимум "незачищенные старые копии" на p7, а не пустой /home.
-    NEW_HOME_UUID=$(blkid -s UUID -o value "$P8")
+    NEW_HOME_UUID=$(blkid -s UUID -o value "$P9")
     info "Обновление /etc/fstab установленной системы (UUID: $NEW_HOME_UUID)..."
     cp -a "$MNT_ROOT/etc/fstab" "$MNT_ROOT/etc/fstab.bak-$TS"
     echo "UUID=${NEW_HOME_UUID}   /home           ext4    defaults          0       2" >> "$MNT_ROOT/etc/fstab"
@@ -330,12 +366,12 @@ success "Раздел p7 успешно уменьшен до 200 ГБ!"
 # 6. Создание раздела p8 (/home)
 # ------------------------------------------------------------------------------
 info "Создание раздела p8 на оставшемся пространстве (~427 ГБ)..."
-run parted -s "$DISK" mkpart "UbuntuHome" ext4 "${P8_START_SECTOR}s" 100%
+run parted -s "$DISK" mkpart "UbuntuHome" ext4 "${P9_START_SECTOR}s" 100%
 run partprobe "$DISK" || true
 run sleep 2
 
 info "Форматирование p8 в ext4 с меткой UbuntuHome..."
-run mkfs.ext4 -F -L "UbuntuHome" "$P8"
+run mkfs.ext4 -F -L "UbuntuHome" "$P9"
 success "Раздел p8 успешно создан и отформатирован!"
 
 
