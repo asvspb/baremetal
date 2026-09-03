@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # S5: критические пути do_migrate_home из split-home.sh.
-# Целевые «устройства» — несуществующие /dev/fakep7, /dev/fakep8: работают
+# Целевые «устройства» — несуществующие /dev/fakep7, /dev/fakep9: работают
 # только заглушки mount/umount/blkid, реальные диски не затрагиваются.
 #
 # ВАЖНО: do_migrate_home вызывается в ДОЧЕРНЕМ bash (без ||-контекста!).
@@ -9,7 +9,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 scenario_init usb
 
-# blkid-заглушка с фиксированным UUID для P8 (do_migrate_home читает его в fstab)
+# blkid-заглушка с фиксированным UUID для P9 (do_migrate_home читает его в fstab)
 STUB_BIN="$STUB_BIN" bash "${REPO_DIR}/tests/stubs/make-stub.sh" blkid 0 --stdout "aaaa-bbbb-cccc"
 
 variant="${1:-success}"
@@ -20,7 +20,7 @@ case "$variant" in
     *) echo "RC=2"; echo "unknown variant"; exit 2 ;;
 esac
 
-# фикстура: «корень p7» с /home и /etc/fstab, пустой «p8»
+# фикстура: «корень p7» с /home и /etc/fstab, пустой «p9»
 MNT_ROOT="/tmp/split_root_mnt"
 MNT_HOME="/tmp/split_home_mnt"
 # leftover'ы прошлого root-прогона может убрать только root — чистим с fallback
@@ -39,7 +39,7 @@ out=$(bash -c "
     DRY=0
     TS='test-ts'
     P7='/dev/fakep7'
-    P8='/dev/fakep8'
+    P9='/dev/fakep9'
     do_migrate_home
 " 2>&1)
 rc=$?
@@ -54,9 +54,9 @@ else
 fi
 # fstab
 if grep -q '^UUID=aaaa-bbbb-cccc .* /home' "$MNT_ROOT/etc/fstab" 2>/dev/null; then
-    echo "FSTAB-HAS-P8"
+    echo "FSTAB-HAS-P9"
 else
-    echo "FSTAB-WITHOUT-P8"
+    echo "FSTAB-WITHOUT-P9"
 fi
 [[ -f "$MNT_ROOT/etc/fstab.bak-test-ts" ]] && echo "FSTAB-BAK-EXISTS"
 [[ -f "$MNT_ROOT/root/parttable-before-split-test-ts.bak" ]] && echo "PARTTABLE-COPIED"

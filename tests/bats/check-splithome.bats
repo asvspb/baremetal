@@ -34,17 +34,17 @@ load 'helpers'
     assert_output --partial "RC=1"
     assert_output --partial "Сверка /home после копирования не сошлась"
     assert_output --partial "HOME-INTACT"
-    assert_output --partial "FSTAB-WITHOUT-P8"
-    refute_output --partial "FSTAB-HAS-P8"
+    assert_output --partial "FSTAB-WITHOUT-P9"
+    refute_output --partial "FSTAB-HAS-P9"
     refute_output --partial "HOME-DELETED"
 }
 
-@test "S5: успех -> fstab c UUID p8, старый /home удалён после fstab, порядок верен" {
+@test "S5: успех -> fstab c UUID p9, старый /home удалён после fstab, порядок верен" {
     run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-migrate.sh" success
     assert_success
     assert_output --partial "RC=0"
     assert_output --partial "Сверка пройдена: копия идентична оригиналу."
-    assert_output --partial "FSTAB-HAS-P8"
+    assert_output --partial "FSTAB-HAS-P9"
     assert_output --partial "FSTAB-BAK-EXISTS"
     assert_output --partial "PARTTABLE-COPIED"
     assert_output --partial "HOME-DELETED"
@@ -56,7 +56,46 @@ load 'helpers'
     assert_failure
     assert_output --partial "RC=1"
     assert_output --partial "HOME-INTACT"
-    assert_output --partial "FSTAB-WITHOUT-P8"
-    refute_output --partial "FSTAB-HAS-P8"
+    assert_output --partial "FSTAB-WITHOUT-P9"
+    refute_output --partial "FSTAB-HAS-P9"
     refute_output --partial "Сверка пройдена"
+}
+
+# ---------- A1: охрана разметки (сценарии sh-guard-layout.sh, PART_SYS_ROOT) ----------
+
+@test "A1: охрана — корректные отпечатки -> layout ok, мутирующих вызовов нет" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-guard-layout.sh" all-good
+    assert_success
+    assert_output --partial "LAYOUT-OK"
+    assert_output --partial "NO-MUTATING"
+}
+
+@test "A1: p9 уже существует -> die «операция уже выполнялась»" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-guard-layout.sh" p9-exists
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "Раздел /dev/fakep9 уже существует"
+    assert_output --partial "NO-MUTATING"
+}
+
+@test "A1: нет раздела Distr (p8) -> die «разметка не соответствует»" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-guard-layout.sh" p8-missing
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "не найден раздел Distr (/dev/fakep8)"
+}
+
+@test "A1: отпечаток Distr не сошёлся (не exfat) -> die «обновите константы»" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-guard-layout.sh" p8-fingerprint
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "Тип ФС на /dev/fakep8: 'vfat', ожидался exfat"
+}
+
+@test "A1: размер p7 не совпал с отпечатком -> die «обновите константы»" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-guard-layout.sh" p7-size
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "Размер /dev/fakep7"
+    assert_output --partial "не совпадает с ожидаемым (1107075072)"
 }
