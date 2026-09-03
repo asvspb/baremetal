@@ -90,6 +90,7 @@ P7_START_SECTOR=638709760
 P7_SIZE_SECTORS=419430400     # 200 GiB (200 * 1024 * 1024 * 2)
 P7_END_SECTOR=$((P7_START_SECTOR + P7_SIZE_SECTORS - 1)) # 1058140159
 P9_START_SECTOR=$((P7_END_SECTOR + 1))                   # 1058140160
+P9_END_SECTOR=$((EXPECT_DISTR_START - 1))                # 1745784831 (перед p8-Distr)
 TARGET_SHRINK_GB=195          # до какого размера сжимаем ФС p7 (запас до границы 200 ГБ)
 USED_LIMIT_GB=190             # отказ, если занято в /home >= этого (ГБ): не влезет после сжатия
 
@@ -366,7 +367,7 @@ success "Раздел p7 успешно уменьшен до 200 ГБ!"
 # 6. Создание раздела p8 (/home)
 # ------------------------------------------------------------------------------
 info "Создание раздела p8 на оставшемся пространстве (~427 ГБ)..."
-run parted -s "$DISK" mkpart "UbuntuHome" ext4 "${P9_START_SECTOR}s" 100%
+run parted -s "$DISK" mkpart "UbuntuHome" ext4 "${P9_START_SECTOR}s" "${P9_END_SECTOR}s"
 run partprobe "$DISK" || true
 run sleep 2
 
