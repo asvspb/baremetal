@@ -48,10 +48,22 @@ ensure_ventoy_tool() {
 
     # Всегда скачиваем закреплённую версию в /tmp (без поиска по /home и /tmp,
     # чтобы случайно не подхватить чужую/битую копию Ventoy2Disk.sh)
-    info "Скачивание Ventoy v${VENTOY_VERSION}..."
+    local url="https://github.com/ventoy/Ventoy/releases/download/v${VENTOY_VERSION}/ventoy-${VENTOY_VERSION}-linux.tar.gz"
+    local tarball="/tmp/ventoy-${VENTOY_VERSION}-linux.tar.gz"
+    info "Скачивание Ventoy v${VENTOY_VERSION} (~18 МБ):"
+    echo "    $url"
     mkdir -p "$VENTOY_DIR"
-    wget -qO- "https://github.com/ventoy/Ventoy/releases/download/v${VENTOY_VERSION}/ventoy-${VENTOY_VERSION}-linux.tar.gz" | \
-        tar -xz -C "/tmp"
+    # Битый недокачанный архив бесполезен для докачки (-c): удаляем и качаем целиком
+    if [[ -f "$tarball" ]] && ! tar -tzf "$tarball" &>/dev/null; then
+        warn "Обнаружен битый ${tarball} — скачиваю заново."
+        rm -f "$tarball"
+    fi
+    # Видимый прогресс + докачка + ретраи (медленный маршрут до GitHub CDN не
+    # должен выглядеть как зависание); прогресс wget пишется в stderr
+    wget -c --tries=5 --timeout=60 --progress=dot:giga -O "$tarball" "$url" \
+        || die "Не удалось скачать Ventoy v${VENTOY_VERSION}: $url (проверьте сеть/прокси; частично скачанный файл будет докачан при повторном запуске)."
+    tar -tzf "$tarball" &>/dev/null || die "Архив Ventoy повреждён: $tarball"
+    tar -xzf "$tarball" -C "/tmp" || die "Не удалось распаковать ${tarball} в /tmp"
     VENTOY_DIR="/tmp/ventoy-${VENTOY_VERSION}"
     [[ -x "${VENTOY_DIR}/Ventoy2Disk.sh" ]] || die "Не удалось загрузить Ventoy v${VENTOY_VERSION} в ${VENTOY_DIR}"
 }
