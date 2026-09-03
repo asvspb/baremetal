@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 # Версия сборки: меняется при каждой правке скрипта. 
 # Выводится в баннере и первой строкой лога — сверяйте с шапкой 
 # актуального файла в репозитории deploy-baremetal.
-$ScriptVersion = "2026-09-02.6"
+$ScriptVersion = "2026-09-02.7"
 
 # ------------------------------------------------------------------------------
 # СИСТЕМНОЕ ЛОГИРОВАНИЕ НА ЦЕЛЕВОЙ НОСИТЕЛЬ
@@ -625,7 +625,7 @@ try {
     # Подключение лог-файла напрямую на накопитель (если есть разделы)
     # --------------------------------------------------------------------------
     $initialPartitions = @(Get-Partition -DiskNumber $targetDisk.Number -ErrorAction SilentlyContinue)
-    $existingParts = @($initialPartitions | Where-Object { $_.DriveLetter -and [int][char]$_.DriveLetter -ne 0 })
+    $existingParts = @($initialPartitions | Where-Object { $_.DriveLetter -and [int][char]$_.DriveLetter -ne 0 -and $_.GptType -ne '{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}' }) # ESP (VTOYEFI) исключен: его файлы загрузчика воссоздает Ventoy2Disk
     if ($existingParts) {
         $firstLetter = "$($existingParts[0].DriveLetter):"
         $usbDirectLog = Join-Path "$firstLetter\" $logFileName

@@ -18,6 +18,15 @@ case "$args" in
             printf '%s\n' "$STUB_LSBLK_PARTS"
         fi
         ;;
+    *-nlpo\ NAME,PARTLABEL,PARTTYPE*)
+        # разделы + GPT-метка/тип: исключение VTOYEFI из бэкапа (make-boot-usb.sh).
+        # Фолбэк на STUB_LSBLK_PARTS_FULL без меток — ничего не исключает.
+        if [[ -n "${STUB_LSBLK_PART_INFO:-}" ]]; then
+            printf '%s\n' "$STUB_LSBLK_PART_INFO"
+        elif [[ -n "${STUB_LSBLK_PARTS_FULL:-}" ]]; then
+            printf '%s\n' "$STUB_LSBLK_PARTS_FULL"
+        fi
+        ;;
     *-npo\ NAME*|*-rnpo\ NAME*|*-nplo\ NAME*|*-nlpo\ NAME*)
         # полные пути разделов для бэкапа make-boot-usb.sh
         if [[ -n "${STUB_LSBLK_PARTS_FULL:-}" ]]; then

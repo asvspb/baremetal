@@ -168,11 +168,34 @@ check_backup_space() {
     info "Места для бэкапа достаточно: нужно ~$(( need_kb / 1024 )) МБ, свободно $(( avail_kb / 1024 )) МБ."
 }
 
+# GPT-тип ESP — так помечается служебный раздел Ventoy (VTOYEFI) установщиком
+# и make-boot-usb.ps1 при его сокрытии. Вместе с PARTLABEL=VTOYEFI идентифицирует
+# раздел, который нельзя включать в бэкап пользовательских данных: его файлы
+# (EFI/, grub/, tool/, ENROLL_*.cer) Ventoy создаёт заново, а восстановление
+# выгружало их на раздел данных (регрессия от 2026-09-02).
+ESP_GPT_TYPE="c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+
 backup_existing_files() {
-    local parts=()
-    while IFS= read -r p; do
-        [[ -n "$p" ]] && parts+=("$p")
-    done < <(lsblk -nlpo NAME "$TARGET_DISK" | grep -v "^${TARGET_DISK}$" || true)
+    local parts=() svc_parts=()
+    local dev plabel ptype is_service f
+    # Поля PARTLABEL/PARTTYPE могут сдвинуться, если PARTLABEL пуст (таблица
+    # MSDOS), поэтому оба поля проверяются на оба признака служебного раздела.
+    while read -r dev plabel ptype; do
+        [[ -n "$dev" && "$dev" != "$TARGET_DISK" ]] || continue
+        is_service=0
+        for f in "$plabel" "$ptype"; do
+            [[ "${f,,}" == "vtoyefi" || "${f,,}" == "$ESP_GPT_TYPE" ]] && is_service=1
+        done
+        if (( is_service )); then
+            svc_parts+=("$dev")
+        else
+            parts+=("$dev")
+        fi
+    done < <(lsblk -nlpo NAME,PARTLABEL,PARTTYPE "$TARGET_DISK" 2>/dev/null || true)
+
+    if (( ${#svc_parts[@]} )); then
+        info "Служебный раздел Ventoy (${svc_parts[*]}) исключен из бэкапа: его содержимое установщик Ventoy создаст заново."
+    fi
 
     [[ ${#parts[@]} -eq 0 ]] && return 0
 

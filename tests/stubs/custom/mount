@@ -4,6 +4,13 @@
 if [[ -n "${STUB_LOG:-}" && -d "${STUB_LOG:-}" ]]; then
     printf '%s\n' "mount $* [cwd=$PWD]" >> "$STUB_LOG/mount.log"
 fi
+# STUB_MOUNT_FAIL_PARTS — разделы (через пробел), для которых mount падает:
+# тест проверяет, что код либо не трогает их вовсе, либо корректно умирает
+if [[ -n "${STUB_MOUNT_FAIL_PARTS:-}" ]]; then
+    for _bad in $STUB_MOUNT_FAIL_PARTS; do
+        [[ "$*" == *"$_bad"* ]] && exit 1
+    done
+fi
 mp="${*: -1}"
 if [[ -n "${STUB_MOUNT_FILL:-}" && -d "$STUB_MOUNT_FILL" && -d "$mp" ]] && [[ "$mp" == /tmp/* ]]; then
     /bin/cp -r "$STUB_MOUNT_FILL/." "$mp/" 2>/dev/null

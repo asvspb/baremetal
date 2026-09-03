@@ -164,7 +164,8 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
 # ---------- Регрессия древесных префиксов lsblk (реальный запуск 2026-09-02) ----------
 
 @test "I-M9: перечисление разделов плоским списком (-l), без префиксов дерева" {
-    # Статика: обе точки перечисления используют -nlpo (не -npo без -l)
+    # Статика: все точки перечисления используют -nlpo (не -npo без -l);
+    # шаблон покрывает и вызов с колонками NAME,PARTLABEL,PARTTYPE
     run grep -c 'lsblk -nlpo NAME' "${REPO_DIR}/make-boot-usb.sh"
     assert_success
     assert_output "2"
@@ -178,4 +179,23 @@ SCEN="${REPO_DIR}/tests/bats/scenarios"
     assert_success
     refute_output --partial $'\u251c\u2500'
     refute_output --partial $'\u2514\u2500'
+}
+
+# ---------- Регрессия бэкапа VTOYEFI (реальный запуск 2026-09-02) ----------
+
+@test "I-M10: служебный раздел VTOYEFI исключен из бэкапа пользовательских данных" {
+    # Статика: перечисление для бэкапа различает разделы по PARTLABEL/PARTTYPE
+    run grep -c 'lsblk -nlpo NAME,PARTLABEL,PARTTYPE' "${REPO_DIR}/make-boot-usb.sh"
+    assert_success
+    assert_output "1"
+    # Функционально: mount для VTOYEFI настроен на сбой — до фикса бэкап
+    # монтировал его и умирал; после фикса раздел даже не пытаются открыть,
+    # а данные пользовательских разделов попадают в бэкап целиком.
+    run timeout 60 bash "${SCEN}/m10-vtoyefi-excluded.sh"
+    assert_success
+    assert_output --partial "RC=0"
+    assert_output --partial "DATA-BACKED-UP"
+    assert_output --partial "NO-VTOY-JUNK"
+    assert_output --partial "VTOYEFI-SKIPPED"
+    refute_output --partial "VTOYEFI-MOUNTED"
 }
