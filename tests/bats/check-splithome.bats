@@ -21,6 +21,8 @@ load 'helpers'
     assert_output --partial "grub-install --efi-directory=/boot/efi"
     assert_output --partial "parttable-before-split-*.bak"
     assert_output --partial "1058140160s 1745784831s"
+    assert_output --partial "ПРЕРВАЛСЯ ДО ЗАВЕРШЕНИЯ"
+    assert_output --partial "resizepart 7 1745784831s"
     refute_output --partial "mkfs.ext4 -F"
 }
 
