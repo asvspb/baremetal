@@ -10,6 +10,18 @@ load 'helpers'
     run timeout 60 bash "${REPO_DIR}/split-home.sh" --help
     assert_success
     assert_output --partial "split-home.sh — Автоматическое"
+    assert_output --partial "--recovery"
+}
+
+@test "REC-1: --recovery -> памятка восстановления (симптомы + лечение)" {
+    run timeout 60 bash "${REPO_DIR}/split-home.sh" --recovery
+    assert_success
+    assert_output --partial "ПАМЯТКА: система не грузится после разделения"
+    assert_output --partial "emergency mode"
+    assert_output --partial "grub-install --efi-directory=/boot/efi"
+    assert_output --partial "parttable-before-split-*.bak"
+    assert_output --partial "1058140160s 1745784831s"
+    refute_output --partial "mkfs.ext4 -F"
 }
 
 @test "S-H1: не-Live система без --dry-run -> die «Загрузитесь с Live-USB»" {

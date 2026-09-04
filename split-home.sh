@@ -24,14 +24,14 @@
 #===============================================================================
 #   ПОРЯДОК ИСПОЛЬЗОВАНИЯ (ПО ШАГАМ):
 #
-#   ШАГ 1. Скопируйте этот скрипт на 2-й раздел загрузочной флешки FD-1 (F2FS):
-#            cp /home/asv-spb/split-home.sh /media/asv-spb/F2FS/
+#   ШАГ 1. Скопируйте этот скрипт на раздел данных загрузочной флешки FD-1 (DATA-A):
+#            cp /home/asv-spb/Dev/deploy-baremetal/split-home.sh /media/asv-spb/DATA-A/
 #
 #   ШАГ 2. Перезагрузите компьютер, в Boot Menu (F12/F11/Esc) выберите флешку.
 #          В меню Ventoy выберите образ Ubuntu и нажмите «Try Ubuntu».
 #
 #   ШАГ 3. Откройте терминал (Ctrl + Alt + T) и перейдите к скрипту:
-#            cd /media/ubuntu/F2FS
+#            cd /media/ubuntu/DATA-A
 #
 #   ШАГ 4. Запустите безопасную симуляцию (проверка без изменения диска):
 #            sudo bash split-home.sh --dry-run
@@ -61,6 +61,10 @@
 #   - Перед изменениями создается дамп таблицы разделов в parttable-*.bak.
 #   - Проверка целостности файловой системы утилитой e2fsck -fy.
 #   - Резервная копия /etc/fstab сохраняется в fstab.bak-*.
+#
+#   ЕСЛИ СИСТЕМА НЕ ЗАГРУЖАЕТСЯ ПОСЛЕ РАЗДЕЛЕНИЯ:
+#     sudo bash split-home.sh --recovery   # офлайн-памятка: симптом -> лечение
+#     (загрузитесь с той же флешки FD-1 в «Try Ubuntu» и выполните команду)
 #===============================================================================
 set -Eeuo pipefail
 trap 'echo -e "\n\033[1;31m[ОШИБКА]\033[0m Сбой выполнения на строке $LINENO" >&2' ERR
@@ -106,12 +110,90 @@ usage() {
     exit 0
 }
 
+# ------------------------------------------------------------------------------
+# Офлайн-памятка: восстановление загрузки, если после разделения система не
+# грузится (--recovery). Живёт в самом скрипте, чтобы всегда быть на флешке
+# вместе с ним. Разделение НЕ трогает цепочку ESP(p1) -> GRUB -> /boot(p7) и
+# не меняет UUID, поэтому «совсем не грузится» — редкость; типовой сбой один:
+# не смонтировался /home (fstab). Опознайте симптом — действуйте по разделу.
+# ------------------------------------------------------------------------------
+recovery_help() {
+    cat <<'REC'
+===============================================================================
+ ПАМЯТКА: система не грузится после разделения (симптом -> лечение)
+===============================================================================
+Бэкапы, оставшиеся после операции:
+  p7:/root/parttable-before-split-*.bak  — дамп GPT ДО разделения
+  p7:/etc/fstab.bak-*                    — fstab ДО добавления строки /home
+Рекомендуется ЗАРАНЕЕ (до операции, на работающей системе) скопировать оба
+на раздел Distr/флешку и снять образ ESP: dd if=/dev/nvme0n1p1 of=esp.img bs=4M
+
+-------------------------------------------------------------------------------
+ 1. «You are in emergency mode» / «Give root password for maintenance»
+    Не смонтировался /home из fstab (единственный реалистичный сбой).
+    Если root-пароль задан — войдите в консоль и правьте на месте:
+        journalctl -xb | grep -i home          # что и почему не смонтировалось
+        blkid /dev/nvme0n1p9                   # фактический UUID p9
+        mount -o remount,rw /
+        nano /etc/fstab                        # поправить UUID или
+                                                # закомментировать строку /home
+        systemctl daemon-reload && reboot
+    Если root-пароль НЕ задан (Ubuntu по умолчанию) — в консоль не пустит;
+    НЕ паникуйте: грузитесь с флешки (Try Ubuntu) и правьте fstab оттуда:
+        sudo mount /dev/nvme0n1p7 /mnt
+        sudo nano /mnt/etc/fstab               # закомментировать строку /home
+        sudo umount /mnt && sudo reboot
+    С закомментированной строкой система грузится с ПУСТЫМ /home — данные не
+    потеряны, они на p9. После загрузки: sudo mount /dev/nvme0n1p9 /mnt,
+    взять UUID из blkid и вернуть строку в fstab.
+
+ 2. Приглашение «(initramfs)» — ядро не нашло корень p7 по UUID.
+    С флешки (Try Ubuntu):
+        sudo e2fsck -fy /dev/nvme0n1p7
+        reboot
+
+ 3. «grub rescue>» или «grub>» — переустановить GRUB с флешки (Try Ubuntu):
+        sudo mount /dev/nvme0n1p7 /mnt
+        sudo mount /dev/nvme0n1p1 /mnt/boot/efi
+        for d in dev proc sys; do sudo mount --bind /$d /mnt/$d; done
+        sudo chroot /mnt
+        grub-install --efi-directory=/boot/efi --bootloader-id=ubuntu
+        update-grub
+        exit
+        sudo reboot
+
+ 4. Мигающий курсор / UEFI не видит загрузчик («No bootable device»).
+    Boot Menu (F12): должны быть «ubuntu» и «Windows Boot Manager».
+    Windows грузится ВСЕГДА (p1–p5 не трогались) — запасной вход в машину.
+    Если потерялась запись «ubuntu» — восстановить из Live (Try Ubuntu):
+        sudo efibootmgr -c -d /dev/nvme0n1 -p 1 -L ubuntu \
+            -l '\EFI\ubuntu\shimx64.efi'
+    Если заранее снят образ ESP (esp.img на Distr/флешке) — вернуть его:
+        sudo dd if=/media/ubuntu/Distr/esp.img of=/dev/nvme0n1p1 bs=4M
+
+ 5. Крайний случай: повреждена сама таблица GPT.
+    Вернуть дамп, снятый скриптом ДО разделения (p7:/root/ или флешка):
+        sudo sfdisk /dev/nvme0n1 < parttable-before-split-*.bak
+    ВАЖНО: дамп сделан ДО создания p9 — верните запись p9 вручную и БЕЗ
+    форматирования (файловая система и данные на p9 целы):
+        sudo parted -s /dev/nvme0n1 mkpart UbuntuHome ext4 \
+            1058140160s 1745784831s
+        # mkfs.ext4 НЕ выполнять!
+
+ Ни одна из процедур не уничтожает данные: /home — на p9 (а при прерывании
+ миграции старые копии остаются на p7), Windows и Distr не затрагиваются.
+===============================================================================
+REC
+    exit 0
+}
+
 parse_args() {
     while (( $# )); do
         case "$1" in
             --dry-run) DRY=1 ;;
             --yes|-y)  YES=1 ;;
             --force)   FORCE=1 ;;
+            --recovery) recovery_help ;;
             -h|--help) usage ;;
             *) die "Неизвестный параметр: $1 (см. --help)" ;;
         esac
