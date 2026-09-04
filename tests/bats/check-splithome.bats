@@ -113,3 +113,23 @@ load 'helpers'
     assert_output --partial "Размер /dev/fakep7"
     assert_output --partial "не совпадает с ожидаемым (1107075072)"
 }
+
+# ---------- A9: освобождение NVMe-разделов до preflight (sh-release-mounts.sh) ----------
+
+@test "A9: Live-автомонтирования -> авто-umount обеих nvme-точек, rc 0, без мутаций" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-release-mounts.sh" ok
+    assert_success
+    assert_output --partial "RC=0"
+    assert_output --partial "RELEASE-OK"
+    assert_output --partial "umount /run/media/ubuntu/1b8e3e50-2e22-4088-a3a5-396293780ff2"
+    assert_output --partial "umount /run/media/ubuntu/Distr"
+    assert_output --partial "NO-MUTATING"
+}
+
+@test "A9 КРИТИЧЕСКИЙ: точка занята (файловый менеджер) -> umount сбой -> die ДО изменений" {
+    run timeout 60 bash "${REPO_DIR}/tests/bats/scenarios/sh-release-mounts.sh" busy
+    assert_failure
+    assert_output --partial "RC=1"
+    assert_output --partial "Не удалось отмонтировать"
+    assert_output --partial "NO-MUTATING"
+}
